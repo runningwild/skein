@@ -1,10 +1,39 @@
 package skein
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
+
+func TestMix(t *testing.T) {
+	Convey("rounds work", t, func() {
+		var stateGot, stateWant [4]uint64
+		stateGot[0], stateGot[1], stateGot[2], stateGot[3] = 4, 5, 6, 7
+		stateWant[0], stateWant[1], stateWant[2], stateWant[3] = 4, 5, 6, 7
+
+		fmt.Printf("%v %v\n", stateGot, stateWant)
+		fourRoundsA(&stateGot)
+		fmt.Printf("%v %v\n", stateGot, stateWant)
+		fourRoundsA_slow(&stateWant)
+		fmt.Printf("%v %v\n", stateGot, stateWant)
+		So(stateGot, ShouldEqual, stateWant)
+		fourRoundsA(&stateGot)
+		fourRoundsA_slow(&stateWant)
+		So(stateGot, ShouldEqual, stateWant)
+		fourRoundsA(&stateGot)
+		fourRoundsA_slow(&stateWant)
+		So(stateGot, ShouldEqual, stateWant)
+	})
+}
+
+func mix256_ref(rot uint, x0, x1 uint64) (y0, y1 uint64) {
+	y0 = x0 + x1
+	y1 = (x1 << rot) | (x1 >> (64 - rot))
+	y1 = y1 ^ y0
+	return
+}
 
 func TestEncryptAndDecrypt(t *testing.T) {
 	Convey("get the right answer for known inputs", t, func() {
@@ -26,8 +55,23 @@ func BenchmarkEncryptBlock(b *testing.B) {
 		block.encrypt()
 	}
 }
+
+func BenchmarkEncryptBlockSlow(b *testing.B) {
+	var block block256_slow
+	for i := 0; i < b.N; i++ {
+		block.encrypt()
+	}
+}
+
 func BenchmarkDecryptBlock(b *testing.B) {
 	var block block256
+	for i := 0; i < b.N; i++ {
+		block.decrypt()
+	}
+}
+
+func BenchmarkDecryptBlockSlow(b *testing.B) {
+	var block block256_slow
 	for i := 0; i < b.N; i++ {
 		block.decrypt()
 	}
