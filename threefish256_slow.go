@@ -1,14 +1,12 @@
-// +build amd64
-
 package skein
 
-type block256 struct {
+type block256_slow struct {
 	state [4]uint64
 	key   [5]uint64 // The user-defined key is the first 4 values, we add the 5th.
 	tweak [3]uint64 // The user-defined tweak is the first 2 values, we add the 3rd.
 }
 
-func (b *block256) encrypt() {
+func (b *block256_slow) encrypt() {
 	b.key[4] = c240 ^ b.key[0] ^ b.key[1] ^ b.key[2] ^ b.key[3]
 	b.tweak[2] = b.tweak[0] ^ b.tweak[1]
 
@@ -35,7 +33,7 @@ func (b *block256) encrypt() {
 	b.state[3] += b.key[(r+3)%5] + uint64(r)
 }
 
-func (b *block256) decrypt() {
+func (b *block256_slow) decrypt() {
 	b.key[4] = c240 ^ b.key[0] ^ b.key[1] ^ b.key[2] ^ b.key[3]
 	b.tweak[2] = b.tweak[0] ^ b.tweak[1]
 
@@ -63,45 +61,45 @@ func (b *block256) decrypt() {
 	}
 }
 
-func (b *block256) mix(d int) {
-	b.state[0], b.state[1] = mix256(d, 0, b.state[0], b.state[1])
-	b.state[2], b.state[3] = mix256(d, 1, b.state[2], b.state[3])
+func (b *block256_slow) mix(d int) {
+	b.state[0], b.state[1] = mix256_slow(d, 0, b.state[0], b.state[1])
+	b.state[2], b.state[3] = mix256_slow(d, 1, b.state[2], b.state[3])
 }
 
-func (b *block256) unmix(d int) {
-	b.state[0], b.state[1] = unmix256(d, 0, b.state[0], b.state[1])
-	b.state[2], b.state[3] = unmix256(d, 1, b.state[2], b.state[3])
+func (b *block256_slow) unmix(d int) {
+	b.state[0], b.state[1] = unmix256_slow(d, 0, b.state[0], b.state[1])
+	b.state[2], b.state[3] = unmix256_slow(d, 1, b.state[2], b.state[3])
 }
 
-func (b *block256) permute() {
+func (b *block256_slow) permute() {
 	// The permutation for 256 just swaps positions 1 and 3.
 	// i.e. perm = [4]int{0, 3, 2, 1}
 	b.state[1], b.state[3] = b.state[3], b.state[1]
 }
 
-func (b *block256) unpermute() {
+func (b *block256_slow) unpermute() {
 	// The permutation for 256 just swaps positions 1 and 3.
 	// i.e. perm = [4]int{0, 3, 2, 1}
 	b.state[1], b.state[3] = b.state[3], b.state[1]
 }
 
-func mix256(d, j int, x0, x1 uint64) (y0, y1 uint64) {
-	r := tf256Rots[d&0x07][j]
+func mix256_slow(d, j int, x0, x1 uint64) (y0, y1 uint64) {
+	r := tf256Rots_slow[d&0x07][j]
 	y0 = x0 + x1
 	y1 = (x1 << r) | (x1 >> (64 - r))
 	y1 = y1 ^ y0
 	return
 }
 
-func unmix256(d, j int, y0, y1 uint64) (x0, x1 uint64) {
-	r := tf256Rots[d&0x07][j]
+func unmix256_slow(d, j int, y0, y1 uint64) (x0, x1 uint64) {
+	r := tf256Rots_slow[d&0x07][j]
 	x1 = y1 ^ y0
 	x1 = (x1 >> r) | (x1 << (64 - r))
 	x0 = y0 - x1
 	return
 }
 
-var tf256Rots = [8][2]uint{
+var tf256Rots_slow = [8][2]uint{
 	{14, 16},
 	{52, 57},
 	{23, 40},
