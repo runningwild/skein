@@ -1,32 +1,42 @@
 package skein
 
+import "fmt"
+
 func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 	pos := 0
 
 	var b block256
+	var first uint64 = 1 << (126 - 64)
+	var last uint64 = 0
 	H := G
+
 	// Annoying thing in the loop condition is to make sure we run this once for a zero-bit message.
-	for i := 0; i < len(M) || (i == 0 && len(M) == 0); i += 32 {
-		b.tweak[1] = Ts[1]
-		if i == 0 {
-			// Set the 'first' bit.
-			b.tweak[1] = b.tweak[1] | (1 << (126 - 64))
-		}
-		if i+32 < len(M) {
-			pos += 32
+	start, pos := 0, 0
+	var buf [32]byte
+	for last == 0 {
+		if start+32 >= len(M) {
+			last = 1 << (127 - 64)
+			pos = len(M)
+			for i := start; i < pos; i++ {
+				buf[i-start] = M[i]
+			}
+			for i := pos - start; i < 32; i++ {
+				buf[i] = 0
+			}
 		} else {
-			pos += len(M) - i
-			// Set the 'final' bit.
-			b.tweak[1] = b.tweak[1] | (1 << (127 - 64))
+			pos += 32
+			copy(buf[:], M[start:pos])
 		}
+		b.tweak[1] = Ts[1] | first | last
+		first = 0
+
 		// Here we aren't supporting sizes over 2^64, even though the spec supports up to 2^96.
 		b.tweak[0] = Ts[0] + uint64(pos)
 
-		var msg64 [4]uint64
-		for j := 0; j+i < len(M) && j < 32; j++ {
-			msg64[j/8] += uint64(M[j+i]) << uint((j%8)*8)
-		}
+		start = pos
+
 		copy(b.key[:], H[:])
+		msg64 := convert256BytesToUint64(buf)
 		b.state = msg64
 		b.encrypt()
 		for i := range H {
@@ -45,6 +55,7 @@ func skein256_128(M []byte) [16]byte {
 		0x00, 0x00, 0x00, // Tree params
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
 	}, [2]uint64{0, 4 << (120 - 64)})
+	panic(fmt.Sprintf("%X", G0))
 	G1 := ubi256(G0, M, [2]uint64{0, 48 << (120 - 64)})
 	H := ubi256(G1, []byte{0, 0, 0, 0, 0, 0, 0, 0}, [2]uint64{0, 63 << (120 - 64)})
 	var buf [16]byte
@@ -53,21 +64,23 @@ func skein256_128(M []byte) [16]byte {
 	return buf
 }
 
+var (
+	skein256_256_cfg = [4]uint64{0xFC9DA860D048B449, 0x2FCA66479FA7D833, 0xB33BC3896656840F, 0x6A54E920FDE8DA69}
+
+	emptyMsg     = []byte{0, 0, 0, 0, 0, 0, 0, 0}
+	tweakTypeMsg = [2]uint64{0, typeMsg}
+	tweakTypeOut = [2]uint64{0, typeOut}
+)
+
+const (
+	typeMsg = 48 << (120 - 64)
+	typeOut = 63 << (120 - 64)
+)
+
 func skein256_256(M []byte) [32]byte {
-	G0 := ubi256([4]uint64{}, []byte{
-		0x53, 0x48, 0x41, 0x33, // SHA1
-		0x01, 0x00, // Version Number
-		0x00, 0x00, // Reserved
-		0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Output size in bits (256)
-		0x00, 0x00, 0x00, // Tree params
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
-	}, [2]uint64{0, 4 << (120 - 64)})
-	G1 := ubi256(G0, M, [2]uint64{0, 48 << (120 - 64)})
-	H := ubi256(G1, []byte{0, 0, 0, 0, 0, 0, 0, 0}, [2]uint64{0, 63 << (120 - 64)})
-	Hbytes := convert256Uint64ToBytes(H)
-	var buf [32]byte
-	copy(buf[:], Hbytes[:])
-	return buf
+	G1 := ubi256(skein256_256_cfg, M, tweakTypeMsg)
+	H := ubi256(G1, emptyMsg, tweakTypeOut)
+	return convert256Uint64ToBytes(H)
 }
 
 func skein256_N(M []byte, N uint64) []byte {
@@ -80,14 +93,14 @@ func skein256_N(M []byte, N uint64) []byte {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
 	}, [2]uint64{0, 4 << (120 - 64)})
 	G1 := ubi256(G0, M, [2]uint64{0, 48 << (120 - 64)})
-	var buf []byte
+	buf := make([]byte, int(N)+32)
 	var c uint64
-	for uint64(len(buf)*8) < N {
+	for c*32 < N {
 		H := ubi256(G1,
 			[]byte{byte(c), byte(c >> 8), byte(c >> 16), byte(c >> 24), byte(c >> 32), byte(c >> 40), byte(c >> 48), byte(c >> 56)},
 			[2]uint64{0, 63 << (120 - 64)})
 		Hbytes := convert256Uint64ToBytes(H)
-		buf = append(buf, Hbytes[:]...)
+		copy(buf[int(c)*32:int(c+1)*32], Hbytes[:])
 		c++
 	}
 	if uint64(len(buf)*8) > N {
@@ -103,8 +116,31 @@ func skein256_N(M []byte, N uint64) []byte {
 
 func convert256Uint64ToBytes(v [4]uint64) [32]byte {
 	var b [32]byte
-	for i := range b {
-		b[i] = byte(v[i/8] >> (uint(i%8) * 8))
+	for i := range v {
+		x := i * 8
+		b[x] = byte(v[i])
+		b[x+1] = byte(v[i] >> 8)
+		b[x+2] = byte(v[i] >> 16)
+		b[x+3] = byte(v[i] >> 24)
+		b[x+4] = byte(v[i] >> 32)
+		b[x+5] = byte(v[i] >> 40)
+		b[x+6] = byte(v[i] >> 48)
+		b[x+7] = byte(v[i] >> 56)
 	}
 	return b
+}
+func convert256BytesToUint64(b [32]byte) [4]uint64 {
+	var v [4]uint64
+	for i := range v {
+		x := i * 8
+		v[i] = uint64(b[x]) |
+			(uint64(b[x+1]) << 8) |
+			(uint64(b[x+2]) << 16) |
+			(uint64(b[x+3]) << 24) |
+			(uint64(b[x+4]) << 32) |
+			(uint64(b[x+5]) << 40) |
+			(uint64(b[x+6]) << 48) |
+			(uint64(b[x+7]) << 56)
+	}
+	return v
 }
