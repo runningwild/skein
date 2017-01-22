@@ -10,7 +10,7 @@ import (
 
 func TestEncryptAndDecrypt(t *testing.T) {
 	Convey("get the right answer for known inputs", t, func() {
-		var b block256
+		var b Block256
 		b.encrypt()
 		So(b.state, ShouldResemble, [4]uint64{0x94eeea8b1f2ada84, 0xadf103313eae6670, 0x952419a1f4b16d53, 0xd83f13e63c9f6b11})
 		b.encrypt()
@@ -23,9 +23,9 @@ func TestEncryptAndDecrypt(t *testing.T) {
 }
 
 func BenchmarkEncryptBlock(b *testing.B) {
-	var block block256
+	var block Block256
 	for i := 0; i < b.N; i++ {
-		block.encrypt()
+		block.Encrypt()
 	}
 }
 
@@ -41,20 +41,20 @@ func BenchmarkEncryptBlock_enceve(b *testing.B) {
 func BenchmarkEncryptBlockSlow(b *testing.B) {
 	var block block256_slow
 	for i := 0; i < b.N; i++ {
-		block.encrypt()
+		block.Encrypt()
 	}
 }
 
 func BenchmarkDecryptBlock(b *testing.B) {
-	var block block256
+	var block Block256
 	for i := 0; i < b.N; i++ {
-		block.decrypt()
+		block.Decrypt()
 	}
 }
 
 func BenchmarkDecryptBlockSlow(b *testing.B) {
-	var block block256_slow
+	var block Block256_slow
 	for i := 0; i < b.N; i++ {
-		block.decrypt()
+		block.Decrypt()
 	}
 }

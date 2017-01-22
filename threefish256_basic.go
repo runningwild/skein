@@ -2,6 +2,6 @@
 
 package skein
 
-type block256 struct {
+type Block256 struct {
 	block256_slow
 }

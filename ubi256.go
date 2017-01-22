@@ -5,7 +5,7 @@ import "fmt"
 func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 	pos := 0
 
-	var b block256
+	var b Block256
 	var first uint64 = 1 << (126 - 64)
 	var last uint64 = 0
 	H := G
@@ -37,8 +37,7 @@ func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 
 		copy(b.key[:], H[:])
 		msg64 := convert256BytesToUint64(buf)
-		b.state = msg64
-		b.encrypt()
+		b.rawEncrypt(&msg64)
 		for i := range H {
 			H[i] = msg64[i] ^ b.state[i]
 		}
@@ -168,4 +167,31 @@ func convert256BytesToUint64(b [32]byte) [4]uint64 {
 			(uint64(b[x+7]) << 56)
 	}
 	return v
+}
+
+func convert256InPlaceUint64ToBytes(v *[4]uint64, b []byte) {
+	for i := range v {
+		x := i * 8
+		b[x] = byte(v[i])
+		b[x+1] = byte(v[i] >> 8)
+		b[x+2] = byte(v[i] >> 16)
+		b[x+3] = byte(v[i] >> 24)
+		b[x+4] = byte(v[i] >> 32)
+		b[x+5] = byte(v[i] >> 40)
+		b[x+6] = byte(v[i] >> 48)
+		b[x+7] = byte(v[i] >> 56)
+	}
+}
+func convert256InPlaceBytesToUint64(b []byte, v *[4]uint64) {
+	for i := range v {
+		x := i * 8
+		v[i] = uint64(b[x]) |
+			(uint64(b[x+1]) << 8) |
+			(uint64(b[x+2]) << 16) |
+			(uint64(b[x+3]) << 24) |
+			(uint64(b[x+4]) << 32) |
+			(uint64(b[x+5]) << 40) |
+			(uint64(b[x+6]) << 48) |
+			(uint64(b[x+7]) << 56)
+	}
 }
