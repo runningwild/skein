@@ -46,7 +46,32 @@ func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 	return H
 }
 
-func skein256_128(M []byte) [16]byte {
+type Skein256PRGN struct {
+	state [4]uint64
+}
+
+func (s *Skein256PRGN) Seed(state [4]uint64) {
+	s.state = state
+}
+
+func (s *Skein256PRGN) Read(b []byte) (n int, err error) {
+	nextState := ubi256(s.state,
+		[]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		tweakTypeOut)
+	var c uint64
+	for c*32 < uint64(len(b)) {
+		H := ubi256(s.state,
+			[]byte{byte(c), byte(c >> 8), byte(c >> 16), byte(c >> 24), byte(c >> 32), byte(c >> 40), byte(c >> 48), byte(c >> 56)},
+			tweakTypeOut)
+		Hbytes := convert256Uint64ToBytes(H)
+		copy(b[int(c)*32:], Hbytes[:])
+		c++
+	}
+	s.state = nextState
+	return len(b), nil
+}
+
+func Skein256_128(M []byte) [16]byte {
 	G0 := ubi256([4]uint64{}, []byte{
 		0x53, 0x48, 0x41, 0x33, // SHA1
 		0x01, 0x00, // Version Number
@@ -77,13 +102,13 @@ const (
 	typeOut = 63 << (120 - 64)
 )
 
-func skein256_256(M []byte) [32]byte {
+func Skein256_256(M []byte) [32]byte {
 	G1 := ubi256(skein256_256_cfg, M, tweakTypeMsg)
 	H := ubi256(G1, emptyMsg, tweakTypeOut)
 	return convert256Uint64ToBytes(H)
 }
 
-func skein256_N(M []byte, N uint64) []byte {
+func Skein256_N(M []byte, N uint64) []byte {
 	G0 := ubi256([4]uint64{}, []byte{
 		0x53, 0x48, 0x41, 0x33, // SHA1
 		0x01, 0x00, // Version Number
