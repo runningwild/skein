@@ -37,7 +37,8 @@ func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 
 		copy(b.key[:], H[:])
 		msg64 := convert256BytesToUint64(buf)
-		b.rawEncrypt(&msg64)
+		b.state = msg64
+		b.rawEncrypt(&b.state)
 		for i := range H {
 			H[i] = msg64[i] ^ b.state[i]
 		}
