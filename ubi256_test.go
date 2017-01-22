@@ -3,6 +3,8 @@ package skein
 import (
 	"testing"
 
+	enceve "github.com/enceve/crypto/skein/skein256"
+
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -91,4 +93,24 @@ func TestSkein(t *testing.T) {
 		})
 
 	})
+}
+
+func BenchmarkSkein256_256_1M(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 1024*1024)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		skein256_256(msg)
+	}
+}
+
+func BenchmarkSkein256_256_1M_enceve(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 1024*1024)
+	var out [32]byte
+	b.StartTimer()
+
+	for i := 0; i < b.N; i++ {
+		enceve.Sum256(&out, msg, nil)
+	}
 }
