@@ -1,4 +1,5 @@
 // +build !amd64
+// +build !arm
 
 package skein
 
