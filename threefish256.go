@@ -37,5 +37,9 @@ func (b *Block256) Decrypt(dst, src []byte) {
 	copy(dst, buf[:])
 }
 
+func (b *Block256) rawDecrypt(state *[4]uint64) {
+	decrypt256(state, &b.key, &b.tweak)
+}
+
 func encrypt256(state *[4]uint64, key *[5]uint64, tweak *[3]uint64)
 func decrypt256(state *[4]uint64, key *[5]uint64, tweak *[3]uint64)
