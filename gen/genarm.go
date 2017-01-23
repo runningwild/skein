@@ -222,35 +222,35 @@ const keySchedEncrypt = `
 const keySchedDecrypt = `
 	// Key Schedule
 	MOVW	key+4(FP),	R12
+	MOVW	{{.K0a}}(R12),		R11		// state[0] += key[{{.D}}%5]
+	SUB.S	R11,		R0
 	MOVW	{{.K0b}}(R12),		R11
-	SUB.S	R11,		R1
-	MOVW	{{.K0a}}(R12),		R11		// state[0] -= key[{{.D}}%5]
-	SBC		R11,		R0
+	SBC		R11,		R1
+	MOVW	{{.K1a}}(R12),		R11		// state[1] += key[({{.D}}+1)%5]
+	SUB.S	R11,		R2
 	MOVW	{{.K1b}}(R12),	R11
-	SUB.S	R11,		R3
-	MOVW	{{.K1a}}(R12),		R11		// state[1] -= key[({{.D}}+1)%5]
-	SBC		R11,		R2
+	SBC		R11,		R3
+	MOVW	{{.K2a}}(R12),	R11		// state[2] += key[({{.D}}+2)%5]
+	SUB.S	R11,		R4
 	MOVW	{{.K2b}}(R12),	R11
-	SUB.S	R11,		R5
-	MOVW	{{.K2a}}(R12),	R11		// state[2] -= key[({{.D}}+2)%5]
-	SBC		R11,		R4
+	SBC		R11,		R5
+	MOVW	{{.K3a}}(R12),	R11		// state[3] += key[({{.D}}+3)%5]
+	SUB.S	R11,		R6
 	MOVW	{{.K3b}}(R12),	R11
-	SUB.S	R11,		R7
-	MOVW	{{.K3a}}(R12),	R11		// state[3] -= key[({{.D}}+3)%5]
-	SBC		R11,		R6
+	SBC		R11,		R7
 
 	MOVW	tweak+8(FP),R12
+	MOVW	{{.T0a}}(R12),		R11		// state[1] += tweak[{{.D}}%3]
+	SUB.S	R11,		R2
 	MOVW	{{.T0b}}(R12),		R11
-	SUB.S	R11,		R3
-	MOVW	{{.T0a}}(R12),		R11		// state[1] -= tweak[{{.D}}%3]
-	SBC		R11,		R2
-	MOVW	{{.T1b}}(R12),		R11
-	SUB.S	R11,		R5	
-	MOVW	{{.T1a}}(R12),		R11		// state[2] -= tweak[({{.D}}+3)%5]
-	SBC		R11,		R4
+	SBC		R11,		R3
+	MOVW	{{.T1a}}(R12),		R11		// state[2] += tweak[({{.D}}+1)%3]
+	SUB.S	R11,		R4
+	MOVW	{{.T1b}}(R12),	R11
+	SBC		R11,		R5
 
-	SUB.S	$0,			R7
-	SBC		${{.D}},			R6		// state[3] -= {{.D}} (round number)
+	SUB.S	${{.D}},			R6		// state[3] += {{.D}} (round number)
+	SBC		$0,			R7
 `
 
 const mixEncrypt = `
@@ -349,8 +349,8 @@ const mixDecrypt = `
 	ORR		R{{.M6}}<<{{.Rot1}},	R{{.M7}}
 	MOVW	R11,	R{{.M6}}
 {{end}}
-	SUB.S	R{{.M7}},		R{{.M5}}
-	SBC		R{{.M6}},		R{{.M4}}			// y0 = x0 - x1
+	SUB.S	R{{.M6}},		R{{.M4}}			// y0 = x0 - x1
+	SBC		R{{.M7}},		R{{.M5}}
 
 	// Mix state[0] and state[1]
 	// y1 = y1 ^ y0
@@ -381,8 +381,8 @@ const mixDecrypt = `
 	ORR		R{{.M2}}<<{{.Rot0}},	R{{.M3}}
 	MOVW	R11,	R{{.M2}}
 {{end}}
-	SUB.S	R{{.M3}},		R{{.M1}}
-	SBC		R{{.M2}},		R{{.M0}}			// y0 = x0 - x1
+	SUB.S	R{{.M2}},		R{{.M0}}			// y0 = x0 - x1
+	SBC		R{{.M3}},		R{{.M1}}
 		`
 const header = `
 // func {{.Pre}}crypt256(state *[4]uint64, key *[5]uint64, tweak *[3]uint64)
