@@ -35,7 +35,7 @@ func main() {
 		panic(err)
 	}
 	buf := bytes.NewBuffer(nil)
-	buf.WriteString("package skein\n")
+	buf.WriteString("package threefish\n")
 	enc.Execute(buf, &params)
 	dec.Execute(buf, &params)
 

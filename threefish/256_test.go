@@ -1,16 +1,17 @@
-package skein
+package threefish_test
 
 import (
 	"testing"
 
 	enceve "github.com/enceve/crypto/skein/threefish"
+	"github.com/runningwild/skein/threefish"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestEncryptAndDecrypt(t *testing.T) {
+func TestEncryptAndDecrypt256(t *testing.T) {
 	Convey("get the right answer for known inputs", t, func() {
-		cipher := MakeCipher256(make([]byte, 32))
+		cipher := threefish.MakeCipher256(make([]byte, 32))
 		state := make([]byte, 32)
 		cipher.Encrypt(state, state)
 		So(state, ShouldResemble, []byte{
@@ -43,24 +44,15 @@ func TestEncryptAndDecrypt(t *testing.T) {
 	})
 }
 
-func BenchmarkEncryptBlock(b *testing.B) {
-	cipher := MakeCipher256(make([]byte, 32))
+func BenchmarkEncrypt256Block(b *testing.B) {
+	cipher := threefish.MakeCipher256(make([]byte, 32))
 	block := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
 		cipher.Encrypt(block, block)
 	}
 }
 
-func BenchmarkEncryptBlockStandalone(b *testing.B) {
-	data := make([]byte, 32)
-	var key [5]uint64
-	var tweak [3]uint64
-	for i := 0; i < b.N; i++ {
-		Encrypt256(data, &key, &tweak)
-	}
-}
-
-func BenchmarkEncryptBlock_enceve(b *testing.B) {
+func BenchmarkEncrypt256Block_enceve(b *testing.B) {
 	var state [4]uint64
 	var key [5]uint64
 	var tweak [3]uint64
@@ -69,15 +61,15 @@ func BenchmarkEncryptBlock_enceve(b *testing.B) {
 	}
 }
 
-func BenchmarkDecryptBlock(b *testing.B) {
-	cipher := MakeCipher256(make([]byte, 32))
+func BenchmarkDecrypt256Block(b *testing.B) {
+	cipher := threefish.MakeCipher256(make([]byte, 32))
 	block := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
 		cipher.Decrypt(block, block)
 	}
 }
 
-func BenchmarkDecryptBlock_enceve(b *testing.B) {
+func BenchmarkDecrypt256Block_enceve(b *testing.B) {
 	var state [4]uint64
 	var key [5]uint64
 	var tweak [3]uint64

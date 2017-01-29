@@ -1,4 +1,4 @@
-package skein
+package threefish
 
 import (
 	"testing"
