@@ -38,7 +38,7 @@ func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 		start = pos
 
 		copy(key[:], H[:])
-		msg64 := inplaceCovertBytesToUInt64(buf[:])
+		msg64 := inplaceConvert32BytesToUInt64(buf[:])
 		state := *msg64
 		encrypt256(&state, &key, &tweak)
 		for i := range H {
@@ -157,19 +157,6 @@ func convert256Uint64ToBytes(v [4]uint64) [32]byte {
 	return b
 }
 
-func convert256InPlaceUint64ToBytes(v *[4]uint64, b []byte) {
-	for i := range v {
-		x := i * 8
-		b[x] = byte(v[i])
-		b[x+1] = byte(v[i] >> 8)
-		b[x+2] = byte(v[i] >> 16)
-		b[x+3] = byte(v[i] >> 24)
-		b[x+4] = byte(v[i] >> 32)
-		b[x+5] = byte(v[i] >> 40)
-		b[x+6] = byte(v[i] >> 48)
-		b[x+7] = byte(v[i] >> 56)
-	}
-}
 func convert256InPlaceBytesToUint64(b []byte, v *[4]uint64) {
 	for i := range v {
 		x := i * 8

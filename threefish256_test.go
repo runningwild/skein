@@ -51,6 +51,15 @@ func BenchmarkEncryptBlock(b *testing.B) {
 	}
 }
 
+func BenchmarkEncryptBlockStandalone(b *testing.B) {
+	data := make([]byte, 32)
+	var key [5]uint64
+	var tweak [3]uint64
+	for i := 0; i < b.N; i++ {
+		Encrypt256(data, &key, &tweak)
+	}
+}
+
 func BenchmarkEncryptBlock_enceve(b *testing.B) {
 	var state [4]uint64
 	var key [5]uint64
