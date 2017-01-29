@@ -5,7 +5,9 @@ import "fmt"
 func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 	pos := 0
 
-	var b Block256
+	var key [5]uint64
+	var tweak [3]uint64
+
 	var first uint64 = 1 << (126 - 64)
 	var last uint64 = 0
 	H := G
@@ -27,20 +29,20 @@ func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 			pos += 32
 			copy(buf[:], M[start:pos])
 		}
-		b.tweak[1] = Ts[1] | first | last
+		tweak[1] = Ts[1] | first | last
 		first = 0
 
 		// Here we aren't supporting sizes over 2^64, even though the spec supports up to 2^96.
-		b.tweak[0] = Ts[0] + uint64(pos)
+		tweak[0] = Ts[0] + uint64(pos)
 
 		start = pos
 
-		copy(b.key[:], H[:])
-		msg64 := convert256BytesToUint64(buf)
-		b.state = msg64
-		b.rawEncrypt(&b.state)
+		copy(key[:], H[:])
+		msg64 := inplaceCovertBytesToUInt64(buf[:])
+		state := *msg64
+		encrypt256(&state, &key, &tweak)
 		for i := range H {
-			H[i] = msg64[i] ^ b.state[i]
+			H[i] = msg64[i] ^ state[i]
 		}
 	}
 	return H
@@ -153,21 +155,6 @@ func convert256Uint64ToBytes(v [4]uint64) [32]byte {
 		b[x+7] = byte(v[i] >> 56)
 	}
 	return b
-}
-func convert256BytesToUint64(b [32]byte) [4]uint64 {
-	var v [4]uint64
-	for i := range v {
-		x := i * 8
-		v[i] = uint64(b[x]) |
-			(uint64(b[x+1]) << 8) |
-			(uint64(b[x+2]) << 16) |
-			(uint64(b[x+3]) << 24) |
-			(uint64(b[x+4]) << 32) |
-			(uint64(b[x+5]) << 40) |
-			(uint64(b[x+6]) << 48) |
-			(uint64(b[x+7]) << 56)
-	}
-	return v
 }
 
 func convert256InPlaceUint64ToBytes(v *[4]uint64, b []byte) {
