@@ -1,5 +1,9 @@
 package threefish
 
+import (
+	"github.com/runningwild/skein/convert"
+)
+
 // Cipher256 implements the go standard cipher.Block interface using the threefish 256-bit cipher.
 type Cipher256 struct {
 	key   [5]uint64 // The user-defined key is the first 4 values, we add the 5th.
@@ -13,7 +17,7 @@ func MakeCipher256(key []byte) *Cipher256 {
 		panic("MakeCipher256 can only be called with a key of exactly 32 bytes")
 	}
 	var c Cipher256
-	key64 := inplaceConvert32BytesToUInt64(key)
+	key64 := convert.Inplace32BytesToUInt64(key)
 	copy(c.key[:], key64[:])
 	return &c
 }
@@ -37,7 +41,7 @@ func (c *Cipher256) Decrypt(dst, src []byte) {
 	if &dst[0] != &src[0] {
 		copy(dst, src)
 	}
-	decrypt256Simple(inplaceConvert32BytesToUInt64(dst), &c.key, &c.tweak)
+	decrypt256Simple(convert.Inplace32BytesToUInt64(dst), &c.key, &c.tweak)
 }
 
 // Encrypt256 encrypts a single block of 32 bytes in place using key and tweak.  The actual key
@@ -48,7 +52,7 @@ func Encrypt256(data []byte, key *[5]uint64, tweak *[3]uint64) {
 	if len(data) != 32 {
 		panic("Encrypt256 requires that data is exactly 32 bytes")
 	}
-	encrypt256(inplaceConvert32BytesToUInt64(data), key, tweak)
+	encrypt256(convert.Inplace32BytesToUInt64(data), key, tweak)
 }
 
 // Decrypt256 decrypts a single block of 32 bytes in place using key and tweak.  The actual key
@@ -59,5 +63,5 @@ func Decrypt256(data []byte, key *[5]uint64, tweak *[3]uint64) {
 	if len(data) != 32 {
 		panic("Decrypt256 requires that data is exactly 32 bytes")
 	}
-	decrypt256(inplaceConvert32BytesToUInt64(data), key, tweak)
+	decrypt256(convert.Inplace32BytesToUInt64(data), key, tweak)
 }
