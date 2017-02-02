@@ -94,10 +94,11 @@ func TestEncryptAndDecrypt1024(t *testing.T) {
 }
 
 func BenchmarkEncrypt1024Block(b *testing.B) {
-	cipher := threefish.MakeCipher1024(make([]byte, 128))
-	block := make([]byte, 128)
+	var key [17]uint64
+	var tweak [3]uint64
+	data := make([]byte, 128)
 	for i := 0; i < b.N; i++ {
-		cipher.Encrypt(block, block)
+		threefish.Encrypt1024(data, &key, &tweak)
 	}
 }
 
@@ -111,10 +112,11 @@ func BenchmarkEncrypt1024Block_enceve(b *testing.B) {
 }
 
 func BenchmarkDecrypt1024Block(b *testing.B) {
-	cipher := threefish.MakeCipher1024(make([]byte, 128))
-	block := make([]byte, 128)
+	var key [17]uint64
+	var tweak [3]uint64
+	data := make([]byte, 128)
 	for i := 0; i < b.N; i++ {
-		cipher.Decrypt(block, block)
+		threefish.Decrypt1024(data, &key, &tweak)
 	}
 }
 

@@ -45,10 +45,11 @@ func TestEncryptAndDecrypt256(t *testing.T) {
 }
 
 func BenchmarkEncrypt256Block(b *testing.B) {
-	cipher := threefish.MakeCipher256(make([]byte, 32))
-	block := make([]byte, 32)
+	var key [5]uint64
+	var tweak [3]uint64
+	data := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
-		cipher.Encrypt(block, block)
+		threefish.Encrypt256(data, &key, &tweak)
 	}
 }
 
@@ -62,10 +63,11 @@ func BenchmarkEncrypt256Block_enceve(b *testing.B) {
 }
 
 func BenchmarkDecrypt256Block(b *testing.B) {
-	cipher := threefish.MakeCipher256(make([]byte, 32))
-	block := make([]byte, 32)
+	var key [5]uint64
+	var tweak [3]uint64
+	data := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
-		cipher.Decrypt(block, block)
+		threefish.Decrypt256(data, &key, &tweak)
 	}
 }
 

@@ -61,10 +61,11 @@ func TestEncryptAndDecrypt512(t *testing.T) {
 }
 
 func BenchmarkEncrypt512Block(b *testing.B) {
-	cipher := threefish.MakeCipher512(make([]byte, 64))
-	block := make([]byte, 64)
+	var key [9]uint64
+	var tweak [3]uint64
+	data := make([]byte, 64)
 	for i := 0; i < b.N; i++ {
-		cipher.Encrypt(block, block)
+		threefish.Encrypt512(data, &key, &tweak)
 	}
 }
 
@@ -78,10 +79,11 @@ func BenchmarkEncrypt512Block_enceve(b *testing.B) {
 }
 
 func BenchmarkDecrypt512Block(b *testing.B) {
-	cipher := threefish.MakeCipher512(make([]byte, 64))
-	block := make([]byte, 64)
+	var key [9]uint64
+	var tweak [3]uint64
+	data := make([]byte, 64)
 	for i := 0; i < b.N; i++ {
-		cipher.Decrypt(block, block)
+		threefish.Decrypt512(data, &key, &tweak)
 	}
 }
 
