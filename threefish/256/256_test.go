@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	enceve "github.com/enceve/crypto/skein/threefish"
-	"github.com/runningwild/skein/threefish"
+	"github.com/runningwild/skein/threefish/256"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestEncryptAndDecrypt256(t *testing.T) {
 	Convey("get the right answer for known inputs", t, func() {
-		cipher := threefish.MakeCipher256(make([]byte, 32))
+		cipher := threefish.MakeCipher([32]byte{})
 		state := make([]byte, 32)
 		cipher.Encrypt(state, state)
 		So(state, ShouldResemble, []byte{
@@ -45,11 +45,11 @@ func TestEncryptAndDecrypt256(t *testing.T) {
 }
 
 func BenchmarkEncrypt256Block(b *testing.B) {
+	var state [32]byte
 	var key [5]uint64
 	var tweak [3]uint64
-	data := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
-		threefish.Encrypt256(data, &key, &tweak)
+		threefish.Encrypt(state[:], &key, &tweak)
 	}
 }
 
@@ -67,7 +67,7 @@ func BenchmarkDecrypt256Block(b *testing.B) {
 	var tweak [3]uint64
 	data := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
-		threefish.Decrypt256(data, &key, &tweak)
+		threefish.Decrypt(data, &key, &tweak)
 	}
 }
 

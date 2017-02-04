@@ -1,17 +1,19 @@
 package threefish_test
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"testing"
 
 	enceve "github.com/enceve/crypto/skein/threefish"
-	"github.com/runningwild/skein/threefish"
+	"github.com/runningwild/skein/threefish/512"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestEncryptAndDecrypt512(t *testing.T) {
 	Convey("get the right answer for known inputs", t, func() {
-		cipher := threefish.MakeCipher512(make([]byte, 64))
+		cipher := threefish.MakeCipher([64]byte{})
 		state := make([]byte, 64)
 		cipher.Encrypt(state, state)
 		So(state, ShouldResemble, []byte{
@@ -61,11 +63,11 @@ func TestEncryptAndDecrypt512(t *testing.T) {
 }
 
 func BenchmarkEncrypt512Block(b *testing.B) {
+	var state [64]byte
 	var key [9]uint64
 	var tweak [3]uint64
-	data := make([]byte, 64)
 	for i := 0; i < b.N; i++ {
-		threefish.Encrypt512(data, &key, &tweak)
+		threefish.Encrypt(state[:], &key, &tweak)
 	}
 }
 
@@ -79,11 +81,11 @@ func BenchmarkEncrypt512Block_enceve(b *testing.B) {
 }
 
 func BenchmarkDecrypt512Block(b *testing.B) {
+	var state [64]byte
 	var key [9]uint64
 	var tweak [3]uint64
-	data := make([]byte, 64)
 	for i := 0; i < b.N; i++ {
-		threefish.Decrypt512(data, &key, &tweak)
+		threefish.Decrypt(state[:], &key, &tweak)
 	}
 }
 
@@ -93,5 +95,23 @@ func BenchmarkDecrypt512Block_enceve(b *testing.B) {
 	var tweak [3]uint64
 	for i := 0; i < b.N; i++ {
 		enceve.Decrypt512(&state, &key, &tweak)
+	}
+}
+
+func BenchmarkThreefishCBCEncryption(b *testing.B) {
+	msg := make([]byte, 1000*1000)
+	for i := 0; i < b.N; i++ {
+		// cipher :=
+		c := cipher.NewCBCEncrypter(threefish.MakeCipher([64]byte{}), make([]byte, 64))
+		c.CryptBlocks(msg, msg)
+	}
+}
+
+func BenchmarkAESCBCEncryption(b *testing.B) {
+	msg := make([]byte, 1000*1000)
+	for i := 0; i < b.N; i++ {
+		b, _ := aes.NewCipher(make([]byte, 16))
+		c := cipher.NewCBCEncrypter(b, make([]byte, 16))
+		c.CryptBlocks(msg, msg)
 	}
 }

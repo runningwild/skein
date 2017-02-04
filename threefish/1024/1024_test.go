@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	enceve "github.com/enceve/crypto/skein/threefish"
-	"github.com/runningwild/skein/threefish"
+	"github.com/runningwild/skein/threefish/1024"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestEncryptAndDecrypt1024(t *testing.T) {
 	Convey("get the right answer for known inputs", t, func() {
-		cipher := threefish.MakeCipher1024(make([]byte, 128))
+		cipher := threefish.MakeCipher([128]byte{})
 		state := make([]byte, 128)
 		cipher.Encrypt(state, state)
 
@@ -94,11 +94,11 @@ func TestEncryptAndDecrypt1024(t *testing.T) {
 }
 
 func BenchmarkEncrypt1024Block(b *testing.B) {
+	var state [128]byte
 	var key [17]uint64
 	var tweak [3]uint64
-	data := make([]byte, 128)
 	for i := 0; i < b.N; i++ {
-		threefish.Encrypt1024(data, &key, &tweak)
+		threefish.Encrypt(state[:], &key, &tweak)
 	}
 }
 
@@ -112,11 +112,11 @@ func BenchmarkEncrypt1024Block_enceve(b *testing.B) {
 }
 
 func BenchmarkDecrypt1024Block(b *testing.B) {
+	var state [128]byte
 	var key [17]uint64
 	var tweak [3]uint64
-	data := make([]byte, 128)
 	for i := 0; i < b.N; i++ {
-		threefish.Decrypt1024(data, &key, &tweak)
+		threefish.Decrypt(state[:], &key, &tweak)
 	}
 }
 
