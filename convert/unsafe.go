@@ -7,6 +7,14 @@ import (
 
 // Does this work on big endian systems?  I don't think so...
 
+// Inplace8BytesToUInt64 returns a pointer to a [1]uint64 that covers the exact bytes in b.
+func Inplace8BytesToUInt64(b []byte) *[1]uint64 {
+	if len(b) != 8 {
+		return nil
+	}
+	return (*[1]uint64)(unsafe.Pointer(&b[0]))
+}
+
 // Inplace16BytesToUInt64 returns a pointer to a [2]uint64 that covers the exact bytes in b.
 func Inplace16BytesToUInt64(b []byte) *[2]uint64 {
 	if len(b) != 16 {
@@ -23,6 +31,14 @@ func Inplace32BytesToUInt64(b []byte) *[4]uint64 {
 	return (*[4]uint64)(unsafe.Pointer(&b[0]))
 }
 
+// Inplace40BytesToUInt64 returns a pointer to a [5]uint64 that covers the exact bytes in b.
+func Inplace40BytesToUInt64(b []byte) *[5]uint64 {
+	if len(b) != 40 {
+		return nil
+	}
+	return (*[5]uint64)(unsafe.Pointer(&b[0]))
+}
+
 // Inplace64BytesToUInt64 returns a pointer to a [8]uint64 that covers the exact bytes in b.
 func Inplace64BytesToUInt64(b []byte) *[8]uint64 {
 	if len(b) != 64 {
@@ -37,6 +53,23 @@ func Inplace128BytesToUInt64(b []byte) *[16]uint64 {
 		return nil
 	}
 	return (*[16]uint64)(unsafe.Pointer(&b[0]))
+}
+
+// InplaceBytesToUInt64 returns a slice of uint64 that covers the exact data in v.
+func InplaceBytesToUint64(b []byte) []uint64 {
+	if len(b)%8 != 0 || len(b) == 0 {
+		return nil
+	}
+	a := reflect.NewAt(reflect.ArrayOf(len(b)/8, reflect.TypeOf(uint64(0))), unsafe.Pointer(&b[0]))
+	return a.Elem().Slice(0, len(b)/8).Interface().([]uint64)
+}
+
+// Inplace1Uint64ToBytes returns a pointer to a [8]byte that covers the exact data in v.
+func Inplace1Uint64ToBytes(v []uint64) *[8]byte {
+	if len(v) != 1 {
+		return nil
+	}
+	return (*[8]byte)(unsafe.Pointer(&v[0]))
 }
 
 // Inplace2Uint64ToBytes returns a pointer to a [16]byte that covers the exact data in v.
@@ -71,11 +104,8 @@ func Inplace16Uint64ToBytes(v []uint64) *[128]byte {
 	return (*[128]byte)(unsafe.Pointer(&v[0]))
 }
 
-// InplaceBytesToUInt64 returns a slice of uint64 that covers the exact data in v.
-func InplaceBytesToUInt64(b []byte) []uint64 {
-	if len(b)%8 != 0 {
-		return nil
-	}
-	a := reflect.NewAt(reflect.ArrayOf(len(b)/8, reflect.TypeOf(uint64(0))), unsafe.Pointer(&b[0]))
-	return a.Elem().Slice(0, len(b)/8).Interface().([]uint64)
+// InplaceUint64ToBytes returns a slice of uint64 that covers the exact data in v.
+func InplaceUint64ToBytes(v []uint64) []byte {
+	a := reflect.NewAt(reflect.ArrayOf(len(v)*8, reflect.TypeOf(byte(0))), unsafe.Pointer(&v[0]))
+	return a.Elem().Slice(0, len(v)*8).Interface().([]byte)
 }

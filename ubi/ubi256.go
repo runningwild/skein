@@ -1,8 +1,8 @@
-package threefish
+package ubi
 
 import (
 	"github.com/runningwild/skein/convert"
-	"github.com/runningwild/skein/threefish"
+	"github.com/runningwild/skein/threefish/256"
 )
 
 func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
@@ -41,7 +41,7 @@ func ubi256(G [4]uint64, M []byte, Ts [2]uint64) [4]uint64 {
 		copy(key[:], H[:])
 		msg64 := convert.Inplace32BytesToUInt64(buf[:])
 		state := *msg64
-		threefish.Encrypt256(buf[:], &key, &tweak)
+		threefish.Encrypt(buf[:], convert.InplaceUint64ToBytes(key[:]), &tweak)
 		for i := range H {
 			H[i] = msg64[i] ^ state[i]
 		}
@@ -83,13 +83,8 @@ var (
 	counter1          = []byte{1, 0, 0, 0, 0, 0, 0, 0}
 	counter2          = []byte{2, 0, 0, 0, 0, 0, 0, 0}
 	counter3          = []byte{3, 0, 0, 0, 0, 0, 0, 0}
-	tweakTypeMsg      = [2]uint64{0, typeMsg}
-	tweakTypeOut      = [2]uint64{0, typeOut}
-)
-
-const (
-	typeMsg = 48 << (120 - 64)
-	typeOut = 63 << (120 - 64)
+	tweakTypeMsg      = [2]uint64{0, uint64(typeMsg)}
+	tweakTypeOut      = [2]uint64{0, uint64(typeOut)}
 )
 
 // Skein256_128 returns the 256-bit skein hash of M with a 128-bit output.
@@ -135,7 +130,7 @@ func Skein256_1024(M []byte) [128]byte {
 // Skein256_256 returns the 256-bit skein hash of M with an N-bit output.
 func Skein256_N(M []byte, N uint64) []byte {
 	G0 := ubi256([4]uint64{}, []byte{
-		0x53, 0x48, 0x41, 0x33, // SHA1
+		0x53, 0x48, 0x41, 0x33, // SHA3
 		0x01, 0x00, // Version Number
 		0x00, 0x00, // Reserved
 		byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
@@ -149,8 +144,7 @@ func Skein256_N(M []byte, N uint64) []byte {
 		H := ubi256(G1,
 			[]byte{byte(c), byte(c >> 8), byte(c >> 16), byte(c >> 24), byte(c >> 32), byte(c >> 40), byte(c >> 48), byte(c >> 56)},
 			[2]uint64{0, 63 << (120 - 64)})
-		Hbytes := convert256Uint64ToBytes(H)
-		copy(buf[int(c)*32:int(c+1)*32], Hbytes[:])
+		copy(buf[int(c)*32:int(c+1)*32], convert.InplaceUint64ToBytes(H[:]))
 		c++
 	}
 	if uint64(len(buf)*8) > N {
@@ -162,20 +156,4 @@ func Skein256_N(M []byte, N uint64) []byte {
 		buf[len(buf)-1] = buf[len(buf)-1] & ((1 << uint(N%8)) - 1)
 	}
 	return buf
-}
-
-func convert256Uint64ToBytes(v [4]uint64) [32]byte {
-	var b [32]byte
-	for i := range v {
-		x := i * 8
-		b[x] = byte(v[i])
-		b[x+1] = byte(v[i] >> 8)
-		b[x+2] = byte(v[i] >> 16)
-		b[x+3] = byte(v[i] >> 24)
-		b[x+4] = byte(v[i] >> 32)
-		b[x+5] = byte(v[i] >> 40)
-		b[x+6] = byte(v[i] >> 48)
-		b[x+7] = byte(v[i] >> 56)
-	}
-	return b
 }

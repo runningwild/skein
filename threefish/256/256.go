@@ -43,23 +43,27 @@ func (c *Cipher) Decrypt(dst, src []byte) {
 }
 
 // Encrypt encrypts a single block of 32 bytes in place using key and tweak.  The actual key
-// itself should be contained in the first 4 elements of key, the fifth value is used internally.
-// Similarly, the tweak should be contained in the first two elements of tweak, the third value is
-// used internally.
-func Encrypt(data []byte, key *[5]uint64, tweak *[3]uint64) {
+// itself should be contained in the first 32 bytes of key, the rest is used internally.  Similarly,
+// the tweak should be contained in the first two elements of tweak, the third value is used internally.
+func Encrypt(data []byte, key []byte, tweak *[3]uint64) {
 	if len(data) != 32 {
 		panic("Encrypt requires that data is exactly 32 bytes")
 	}
-	encrypt256(convert.Inplace32BytesToUInt64(data), key, tweak)
+	if len(key) != 40 {
+		panic("Encrypt requires that key is exactly 40 bytes")
+	}
+	encrypt256(convert.Inplace32BytesToUInt64(data), convert.Inplace40BytesToUInt64(key), tweak)
 }
 
 // Decrypt decrypts a single block of 32 bytes in place using key and tweak.  The actual key
-// itself should be contained in the first 4 elements of key, the fifth value is used internally.
-// Similarly, the tweak should be contained in the first two elements of tweak, the third value is
-// used internally.
-func Decrypt(data []byte, key *[5]uint64, tweak *[3]uint64) {
+// itself should be contained in the first 32 bytes of key, the rest is used internally.  Similarly,
+// the tweak should be contained in the first two elements of tweak, the third value is used internally.
+func Decrypt(data []byte, key []byte, tweak *[3]uint64) {
 	if len(data) != 32 {
 		panic("Decrypt requires that data is exactly 32 bytes")
 	}
-	decrypt256(convert.Inplace32BytesToUInt64(data), key, tweak)
+	if len(key) != 40 {
+		panic("Encrypt requires that key is exactly 40 bytes")
+	}
+	decrypt256(convert.Inplace32BytesToUInt64(data), convert.Inplace40BytesToUInt64(key), tweak)
 }
