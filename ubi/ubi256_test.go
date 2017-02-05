@@ -3,6 +3,7 @@ package ubi_test
 import (
 	"testing"
 
+	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 
@@ -187,6 +188,14 @@ func TestSkein256(t *testing.T) {
 	})
 }
 
+func BenchmarkSkein256PRNG_1k(b *testing.B) {
+	var rng ubi.Skein256PRNG
+	buf := make([]byte, 1024)
+	for i := 0; i < b.N; i++ {
+		rng.Read(buf)
+	}
+}
+
 func BenchmarkSkein256_256_16B(b *testing.B) {
 	b.StopTimer()
 	msg := make([]byte, 16)
@@ -196,11 +205,12 @@ func BenchmarkSkein256_256_16B(b *testing.B) {
 	}
 }
 
-func BenchmarkSkein256PRNG_1k(b *testing.B) {
-	var rng ubi.Skein256PRNG
-	buf := make([]byte, 1024)
+func BenchmarkSkein256_256_1M(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 1024*1024)
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		rng.Read(buf)
+		ubi.Skein256_256(msg)
 	}
 }
 
@@ -215,15 +225,6 @@ func BenchmarkSkein_enceve_256_256_16B(b *testing.B) {
 	}
 }
 
-func BenchmarkSkein256_256_1M(b *testing.B) {
-	b.StopTimer()
-	msg := make([]byte, 1024*1024)
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		ubi.Skein256_256(msg)
-	}
-}
-
 func BenchmarkSkein_enceve_256_256_1M(b *testing.B) {
 	b.StopTimer()
 	msg := make([]byte, 1024*1024)
@@ -232,6 +233,33 @@ func BenchmarkSkein_enceve_256_256_1M(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		enceve.Sum256(&out, msg, nil)
+	}
+}
+
+func BenchmarkMD51_16B(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 16)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		md5.Sum(msg)
+	}
+}
+
+func BenchmarkMD51_1M(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 1024*1024)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		md5.Sum(msg)
+	}
+}
+
+func BenchmarkSHA1_16B(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 16)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sha1.Sum(msg)
 	}
 }
 
@@ -244,12 +272,30 @@ func BenchmarkSHA1_1M(b *testing.B) {
 	}
 }
 
+func BenchmarkSHA256_16B(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 16)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sha256.Sum256(msg)
+	}
+}
+
 func BenchmarkSHA256_1M(b *testing.B) {
 	b.StopTimer()
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		sha256.Sum256(msg)
+	}
+}
+
+func BenchmarkSHA3_16B(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 16)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sha3.Sum256(msg)
 	}
 }
 

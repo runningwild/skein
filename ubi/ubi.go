@@ -23,8 +23,23 @@ func New(tbc TweakableBlockCipher, blockSize int) (*UBI, error) {
 		convertBlockUint64ToBytes = func(v []uint64) []byte {
 			return convert.Inplace4Uint64ToBytes(v)[:]
 		}
+
 	case 512:
+		convertBlockBytesToUint64 = func(b []byte) []uint64 {
+			return convert.Inplace64BytesToUInt64(b)[:]
+		}
+		convertBlockUint64ToBytes = func(v []uint64) []byte {
+			return convert.Inplace8Uint64ToBytes(v)[:]
+		}
+
 	case 1024:
+		convertBlockBytesToUint64 = func(b []byte) []uint64 {
+			return convert.Inplace128BytesToUInt64(b)[:]
+		}
+		convertBlockUint64ToBytes = func(v []uint64) []byte {
+			return convert.Inplace16Uint64ToBytes(v)[:]
+		}
+
 	default:
 		return nil, fmt.Errorf("only block sizes 256, 512, and 1024 are supported")
 	}
@@ -96,9 +111,7 @@ func (ubi *UBI) UBI(G []byte, M []byte, Ts [2]uint64) []byte {
 		tweak[0] += uint64(ubi.blockBytes)
 
 		ubi.tbc(state, H, &tweak)
-		for i := range state {
-			H[i] = M[i] ^ state[i]
-		}
+		convert.Xor(H[0:ubi.blockBytes], M[0:ubi.blockBytes], state)
 		M = M[ubi.blockBytes:]
 		tweak[1] &^= (1 << (126 - 64)) // unset the 'first' bit
 	}
@@ -109,13 +122,11 @@ func (ubi *UBI) UBI(G []byte, M []byte, Ts [2]uint64) []byte {
 	block64 := ubi.convertBlockBytesToUint64(lastBlock)
 	copy(state64, block64)
 	ubi.tbc(lastBlock, H, &tweak)
-	for i := range lastBlock {
-		H[i] = lastBlock[i] ^ state[i]
-	}
+	convert.Xor(H[0:ubi.blockBytes], lastBlock, state)
 	return H[0:ubi.blockBytes]
 }
 
-func (ubi *UBI) Skein(M []byte, N uint64) []byte {
+func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
 	G0, ok := ubi.Gs[N]
 	if !ok {
 		G0 = ubi.UBI(make([]byte, ubi.blockBytes), []byte{

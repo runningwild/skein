@@ -47,12 +47,28 @@ func Inplace64BytesToUInt64(b []byte) *[8]uint64 {
 	return (*[8]uint64)(unsafe.Pointer(&b[0]))
 }
 
+// Inplace72BytesToUInt64 returns a pointer to a [9]uint64 that covers the exact bytes in b.
+func Inplace72BytesToUInt64(b []byte) *[9]uint64 {
+	if len(b) != 72 {
+		return nil
+	}
+	return (*[9]uint64)(unsafe.Pointer(&b[0]))
+}
+
 // Inplace128BytesToUInt64 returns a pointer to a [16]uint64 that covers the exact bytes in b.
 func Inplace128BytesToUInt64(b []byte) *[16]uint64 {
 	if len(b) != 128 {
 		return nil
 	}
 	return (*[16]uint64)(unsafe.Pointer(&b[0]))
+}
+
+// Inplace136BytesToUInt64 returns a pointer to a [17]uint64 that covers the exact bytes in b.
+func Inplace136BytesToUInt64(b []byte) *[17]uint64 {
+	if len(b) != 136 {
+		return nil
+	}
+	return (*[17]uint64)(unsafe.Pointer(&b[0]))
 }
 
 // InplaceBytesToUInt64 returns a slice of uint64 that covers the exact data in v.
@@ -108,4 +124,13 @@ func Inplace16Uint64ToBytes(v []uint64) *[128]byte {
 func InplaceUint64ToBytes(v []uint64) []byte {
 	a := reflect.NewAt(reflect.ArrayOf(len(v)*8, reflect.TypeOf(byte(0))), unsafe.Pointer(&v[0]))
 	return a.Elem().Slice(0, len(v)*8).Interface().([]byte)
+}
+
+func Xor(a, b, c []byte) {
+	if len(a) != len(b) || len(b) != len(c) || len(a)&0x07 != 0 {
+		panic("Xor requires all slices have the same length that is a multiple of 8")
+	}
+	for i := 0; i < len(a); i += 8 {
+		*(*uint64)(unsafe.Pointer(&a[i])) = (*(*uint64)(unsafe.Pointer(&b[i]))) ^ (*(*uint64)(unsafe.Pointer(&c[i])))
+	}
 }
