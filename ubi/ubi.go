@@ -68,6 +68,13 @@ type UBI struct {
 }
 
 func (ubi *UBI) UBI(G []byte, M []byte, Ts [2]uint64) []byte {
+	return ubi.UBIBits(G, 0, M, Ts)
+}
+
+func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []byte {
+	if lastByteBits < 0 || lastByteBits >= 8 {
+		panic("lastByteBits must be in [0, 7]")
+	}
 	if len(G) != ubi.blockBytes {
 		panic(fmt.Sprintf("G must match the block size, %d != %d", len(G), ubi.blockSize))
 	}
@@ -119,6 +126,13 @@ func (ubi *UBI) UBI(G []byte, M []byte, Ts [2]uint64) []byte {
 	// Process the last block.
 	tweak[0] += uint64(rem)
 	tweak[1] |= (1 << (127 - 64)) // set the 'last' bit
+	if lastByteBits != 0 {
+		tweak[1] |= (1 << (119 - 64)) // set the 'bitpad' bit
+		b := lastBlock[rem-1]
+		var lastUsedBit byte = 1 << uint(7-lastByteBits+1)
+		b = (b &^ (lastUsedBit - 1)) | (lastUsedBit >> 1)
+		lastBlock[rem-1] = b
+	}
 	block64 := ubi.convertBlockBytesToUint64(lastBlock)
 	copy(state64, block64)
 	ubi.tbc(lastBlock, H, &tweak)
@@ -127,6 +141,9 @@ func (ubi *UBI) UBI(G []byte, M []byte, Ts [2]uint64) []byte {
 }
 
 func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
+	if len(M) != (msgLen+7)/8 {
+		panic("len(M) and msgLen do not match")
+	}
 	G0, ok := ubi.Gs[N]
 	if !ok {
 		G0 = ubi.UBI(make([]byte, ubi.blockBytes), []byte{
@@ -139,7 +156,7 @@ func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
 		}, [2]uint64{0, 4 << (120 - 64)})
 		ubi.Gs[N] = G0
 	}
-	G1 := ubi.UBI(G0, M, tweakTypeMsg)
+	G1 := ubi.UBIBits(G0, msgLen&0x07, M, tweakTypeMsg)
 	buf := make([]byte, int(N)/8+ubi.blockBytes)
 	view := buf[:]
 	// put c in an array so we can convert it to bytes to pass to UBI.
@@ -162,6 +179,11 @@ func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
 	return buf
 
 }
+
+var (
+	tweakTypeMsg = [2]uint64{0, uint64(typeMsg)}
+	tweakTypeOut = [2]uint64{0, uint64(typeOut)}
+)
 
 func ConfigTweak(position uint64, treeLevel uint64, bitPad bool, typ configType, first, final bool) [2]uint64 {
 	var block [2]uint64
