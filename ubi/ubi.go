@@ -140,13 +140,34 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 	return H[0:ubi.blockBytes]
 }
 
-func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
-	if len(M) != (msgLen+7)/8 {
-		panic("len(M) and msgLen do not match")
+func (ubi *UBI) Hash(M []byte, MBits int, N uint64) []byte {
+	return ubi.skein(nil, []tuple{{typeMsg, M, MBits}}, N)
+}
+
+func (ubi *UBI) MAC(K []byte, M []byte, MBits int, N uint64) []byte {
+	return ubi.skein(K, []tuple{{typeMsg, M, MBits}}, N)
+}
+
+type tuple struct {
+	typ     configType
+	msg     []byte
+	msgBits int
+}
+
+// Nb - The internal state size, this is known implicitly in the ubi object.
+// No (N) - The output size, in bits.
+// K - A key of Nk bytes. Set to the empty string (Nk = 0) if no key is desired.
+// L List of t tuples (Ti,Mi) where Ti is a type value and Mi is a string of bits encoded in a string of bytes.
+func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
+	for i := range L {
+		if len(L[i].msg) != (L[i].msgBits+7)/8 {
+			panic(fmt.Sprintf("len(L[%d].msg) and L[%d].msgBits do not match", i, i))
+		}
 	}
-	G0, ok := ubi.Gs[N]
-	if !ok {
-		G0 = ubi.UBI(make([]byte, ubi.blockBytes), []byte{
+	var G0 []byte
+	if len(K) > 0 {
+		Kcompressed := ubi.UBI(make([]byte, ubi.blockBytes), K, tweakTypeKey)
+		G0 = ubi.UBI(Kcompressed, []byte{
 			0x53, 0x48, 0x41, 0x33, // SHA3
 			0x01, 0x00, // Version Number
 			0x00, 0x00, // Reserved
@@ -154,9 +175,25 @@ func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
 			0x00, 0x00, 0x00, // Tree params
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
 		}, [2]uint64{0, 4 << (120 - 64)})
-		ubi.Gs[N] = G0
+	} else {
+		var ok bool
+		G0, ok = ubi.Gs[N]
+		if !ok {
+			G0 = ubi.UBI(make([]byte, ubi.blockBytes), []byte{
+				0x53, 0x48, 0x41, 0x33, // SHA3
+				0x01, 0x00, // Version Number
+				0x00, 0x00, // Reserved
+				byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
+				0x00, 0x00, 0x00, // Tree params
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
+			}, [2]uint64{0, 4 << (120 - 64)})
+			ubi.Gs[N] = G0
+		}
 	}
-	G1 := ubi.UBIBits(G0, msgLen&0x07, M, tweakTypeMsg)
+	var Gn []byte = G0
+	for i := range L {
+		Gn = ubi.UBIBits(Gn, L[i].msgBits&0x07, L[i].msg, [2]uint64{0, uint64(L[i].typ)})
+	}
 	buf := make([]byte, int(N)/8+ubi.blockBytes)
 	view := buf[:]
 	// put c in an array so we can convert it to bytes to pass to UBI.
@@ -164,7 +201,7 @@ func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
 	cb := convert.Inplace1Uint64ToBytes(c[:])[:]
 	iterations := (N + uint64(ubi.blockSize) - 1) / uint64(ubi.blockSize)
 	for c[0] < iterations {
-		copy(view, ubi.UBI(G1, cb, tweakTypeOut))
+		copy(view, ubi.UBI(Gn, cb, tweakTypeOut))
 		view = view[ubi.blockBytes:]
 		c[0]++
 	}
@@ -177,10 +214,10 @@ func (ubi *UBI) Skein(M []byte, msgLen int, N uint64) []byte {
 		}
 	}
 	return buf
-
 }
 
 var (
+	tweakTypeKey = [2]uint64{0, uint64(typeKey)}
 	tweakTypeMsg = [2]uint64{0, uint64(typeMsg)}
 	tweakTypeOut = [2]uint64{0, uint64(typeOut)}
 )

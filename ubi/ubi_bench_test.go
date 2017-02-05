@@ -15,7 +15,7 @@ func BenchmarkSkein_256_256_16B(b *testing.B) {
 	msg := make([]byte, 16)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Skein(msg, len(msg)*8, 256)
+		u.Hash(msg, len(msg)*8, 256)
 	}
 }
 
@@ -25,7 +25,7 @@ func BenchmarkSkein_256_256_1M(b *testing.B) {
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Skein(msg, len(msg)*8, 256)
+		u.Hash(msg, len(msg)*8, 256)
 	}
 }
 
@@ -35,7 +35,7 @@ func BenchmarkSkein_512_256_16B(b *testing.B) {
 	msg := make([]byte, 16)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Skein(msg, len(msg)*8, 256)
+		u.Hash(msg, len(msg)*8, 256)
 	}
 }
 
@@ -45,7 +45,7 @@ func BenchmarkSkein_512_256_1M(b *testing.B) {
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Skein(msg, len(msg)*8, 256)
+		u.Hash(msg, len(msg)*8, 256)
 	}
 }
 
@@ -55,7 +55,7 @@ func BenchmarkSkein_1024_256_16B(b *testing.B) {
 	msg := make([]byte, 16)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Skein(msg, len(msg)*8, 256)
+		u.Hash(msg, len(msg)*8, 256)
 	}
 }
 
@@ -65,6 +65,6 @@ func BenchmarkSkein_1024_256_1M(b *testing.B) {
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Skein(msg, len(msg)*8, 256)
+		u.Hash(msg, len(msg)*8, 256)
 	}
 }
