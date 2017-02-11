@@ -45,25 +45,25 @@ func (c *Cipher) Decrypt(dst, src []byte) {
 // Encrypt encrypts a single block of 128 bytes in place using key and tweak.  The actual key
 // itself should be contained in the first 128 bytes of key, the rest is used internally.  Similarly,
 // the tweak should be contained in the first two elements of tweak, the third value is used internally.
-func Encrypt(data []byte, key []byte, tweak *[3]uint64) {
+func Encrypt(data []byte, key []byte, tweak []byte) {
 	if len(data) != 128 {
 		panic("Encrypt requires that data is exactly 128 bytes")
 	}
 	if len(key) != 136 {
 		panic("Encrypt requires that key is exactly 136 bytes")
 	}
-	encrypt1024(convert.Inplace128BytesToUInt64(data), convert.Inplace136BytesToUInt64(key), tweak)
+	encrypt1024(convert.Inplace128BytesToUInt64(data), convert.Inplace136BytesToUInt64(key), convert.Inplace24BytesToUInt64(tweak))
 }
 
 // Decrypt decrypts a single block of 128 bytes in place using key and tweak.  The actual key
 // itself should be contained in the first 128 bytes of key, the rest is used internally.  Similarly,
 // the tweak should be contained in the first two elements of tweak, the third value is used internally.
-func Decrypt(data []byte, key []byte, tweak *[3]uint64) {
+func Decrypt(data []byte, key []byte, tweak []byte) {
 	if len(data) != 128 {
 		panic("Decrypt requires that data is exactly 128 bytes")
 	}
 	if len(key) != 136 {
 		panic("Encrypt requires that key is exactly 136 bytes")
 	}
-	decrypt1024(convert.Inplace128BytesToUInt64(data), convert.Inplace136BytesToUInt64(key), tweak)
+	decrypt1024(convert.Inplace128BytesToUInt64(data), convert.Inplace136BytesToUInt64(key), convert.Inplace24BytesToUInt64(tweak))
 }

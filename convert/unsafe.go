@@ -23,6 +23,14 @@ func Inplace16BytesToUInt64(b []byte) *[2]uint64 {
 	return (*[2]uint64)(unsafe.Pointer(&b[0]))
 }
 
+// Inplace24BytesToUInt64 returns a pointer to a [3]uint64 that covers the exact bytes in b.
+func Inplace24BytesToUInt64(b []byte) *[3]uint64 {
+	if len(b) != 24 {
+		return nil
+	}
+	return (*[3]uint64)(unsafe.Pointer(&b[0]))
+}
+
 // Inplace32BytesToUInt64 returns a pointer to a [4]uint64 that covers the exact bytes in b.
 func Inplace32BytesToUInt64(b []byte) *[4]uint64 {
 	if len(b) != 32 {
@@ -94,6 +102,14 @@ func Inplace2Uint64ToBytes(v []uint64) *[16]byte {
 		return nil
 	}
 	return (*[16]byte)(unsafe.Pointer(&v[0]))
+}
+
+// Inplace3Uint64ToBytes returns a pointer to a [24]byte that covers the exact data in v.
+func Inplace3Uint64ToBytes(v []uint64) *[24]byte {
+	if len(v) != 3 {
+		return nil
+	}
+	return (*[24]byte)(unsafe.Pointer(&v[0]))
 }
 
 // Inplace4Uint64ToBytes returns a pointer to a [32]byte that covers the exact data in v.
