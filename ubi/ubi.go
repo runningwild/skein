@@ -6,7 +6,7 @@ import (
 	"github.com/runningwild/skein/convert"
 )
 
-type TweakableBlockCipher func(data []byte, key []byte, tweak *[3]uint64)
+type TweakableBlockCipher func(data []byte, key []byte, tweak []byte)
 
 func New(tbc TweakableBlockCipher, blockSize int) (*UBI, error) {
 	if blockSize <= 0 || blockSize%8 != 0 {
@@ -117,7 +117,7 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 		// Here we aren't supporting sizes over 2^64, even though the spec supports up to 2^96.
 		tweak[0] += uint64(ubi.blockBytes)
 
-		ubi.tbc(state, H, &tweak)
+		ubi.tbc(state, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
 		convert.Xor(H[0:ubi.blockBytes], M[0:ubi.blockBytes], state)
 		M = M[ubi.blockBytes:]
 		tweak[1] &^= (1 << (126 - 64)) // unset the 'first' bit
@@ -135,7 +135,7 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 	}
 	block64 := ubi.convertBlockBytesToUint64(lastBlock)
 	copy(state64, block64)
-	ubi.tbc(lastBlock, H, &tweak)
+	ubi.tbc(lastBlock, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
 	convert.Xor(H[0:ubi.blockBytes], lastBlock, state)
 	return H[0:ubi.blockBytes]
 }
