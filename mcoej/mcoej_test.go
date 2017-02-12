@@ -55,16 +55,16 @@ func TestSkein1024(t *testing.T) {
 
 var (
 	benchmarkPublicData   []byte
-	benchmarkPlaintext16b []byte
+	benchmarkPlaintext32b []byte
 	benchmarkPlaintext1k  []byte
 	benchmarkPlaintext1M  []byte
 )
 
 func init() {
 	benchmarkPublicData = []byte("this is public data, rawr       ") // 32 bytes
-	benchmarkPlaintext16b = make([]byte, 16)
-	for i := range benchmarkPlaintext16b {
-		benchmarkPlaintext16b[i] = byte(i)
+	benchmarkPlaintext32b = make([]byte, 32)
+	for i := range benchmarkPlaintext32b {
+		benchmarkPlaintext32b[i] = byte(i)
 	}
 	benchmarkPlaintext1k = make([]byte, 1024)
 	for i := range benchmarkPlaintext1k {
@@ -76,7 +76,7 @@ func init() {
 	}
 }
 
-func BenchmarkMcOEJLock_10b(b *testing.B) {
+func BenchmarkMcOEJLock_32b(b *testing.B) {
 	b.StopTimer()
 	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
 	key := [64]byte{0, 1, 2, 3, 4, 5}
@@ -84,17 +84,17 @@ func BenchmarkMcOEJLock_10b(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext16b, nil)
+		mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext32b, nil)
 	}
 }
 
-func BenchmarkMcOEJUnlock_10b(b *testing.B) {
+func BenchmarkMcOEJUnlock_32b(b *testing.B) {
 	b.StopTimer()
 	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
 
-	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext16b, nil)
+	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext32b, nil)
 	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
 		panic(err)
 	}
@@ -104,21 +104,32 @@ func BenchmarkMcOEJUnlock_10b(b *testing.B) {
 	}
 }
 
-func BenchmarkAESCBC_10b(b *testing.B) {
+func BenchmarkAESCBC_32b(b *testing.B) {
 	b.StopTimer()
 	c, err := aes.NewCipher(make([]byte, 16))
 	if err != nil {
 		panic(err)
 	}
 	en := cipher.NewCBCEncrypter(c, make([]byte, 16))
-	data := make([]byte, len(benchmarkPublicData)+len(benchmarkPlaintext16b))
+	data := make([]byte, len(benchmarkPublicData)+len(benchmarkPlaintext32b))
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		en.CryptBlocks(data, data)
 	}
 }
 
-func BenchmarkAESGCMSeal_10b(b *testing.B) {
+func BenchmarkThreefish512_CBC_32b(b *testing.B) {
+	b.StopTimer()
+	c := tf512.MakeCipher([64]byte{})
+	en := cipher.NewCBCEncrypter(c, make([]byte, 64))
+	data := make([]byte, len(benchmarkPublicData)+len(benchmarkPlaintext32b))
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		en.CryptBlocks(data, data)
+	}
+}
+
+func BenchmarkAESGCMSeal_32b(b *testing.B) {
 	b.StopTimer()
 	c, err := aes.NewCipher(make([]byte, 16))
 	if err != nil {
@@ -132,7 +143,7 @@ func BenchmarkAESGCMSeal_10b(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		gcm.Seal(nil, nonce[:], benchmarkPlaintext16b, benchmarkPublicData)
+		gcm.Seal(nil, nonce[:], benchmarkPlaintext32b, benchmarkPublicData)
 	}
 }
 

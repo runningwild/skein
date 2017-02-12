@@ -36,6 +36,24 @@ func BenchmarkXor8Bytes(b *testing.B) {
 	}
 }
 
+func BenchmarkCipherXor64Bytes(b *testing.B) {
+	x := make([]byte, 64)
+	y := make([]byte, 64)
+	z := make([]byte, 64)
+	for i := 0; i < b.N; i++ {
+		convert.XorBytes(x, y, z)
+	}
+}
+
+func BenchmarkCipherXor8Bytes(b *testing.B) {
+	x := make([]byte, 8)
+	y := make([]byte, 8)
+	z := make([]byte, 8)
+	for i := 0; i < b.N; i++ {
+		convert.XorBytes(x, y, z)
+	}
+}
+
 func BenchmarkXor64Bytes(b *testing.B) {
 	x := make([]byte, 64)
 	y := make([]byte, 64)
