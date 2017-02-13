@@ -94,6 +94,78 @@ func TestMcOEJ(t *testing.T) {
 	})
 }
 
+func TestMcOEJ256(t *testing.T) {
+	Convey("mcoej 256", t, func() {
+		datas := [][]byte{
+			[]byte(""),
+			[]byte("Data"),
+			[]byte("lessthan128bits"),
+			[]byte("exactly 128 bits"),
+			[]byte("morethan 128 bits"),
+			[]byte("less than 256 bits-------------"),
+			[]byte("exactly 256 bits----------------"),
+			[]byte("more than 256 bits---------------"),
+			[]byte("This is a bunch of data, just to make sure it is longer than the other things."),
+		}
+		mc := mcoej.New256()
+		So(mc, ShouldNotBeNil)
+		key := make([]byte, 32)
+		nonce := make([]byte, 32)
+		key[0], key[1], key[2] = 10, 20, 30
+		nonce[0], nonce[1], nonce[2] = 40, 50, 60
+		for _, publicData := range datas {
+			for _, plaintext := range datas {
+				Convey(fmt.Sprintf("public data: %q, plaintext: %q", publicData, plaintext), func() {
+					ciphertext := mc.Lock(key, nonce, publicData, plaintext, nil)
+					Convey("decrypt should reverse encryption", func() {
+						output, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						So(err, ShouldBeNil)
+						So(output, ShouldResemble, plaintext)
+					})
+					Convey("decrypt should fail if the public data has been changed", func() {
+						publicData = append(publicData, 0)
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						publicData = publicData[0 : len(publicData)-1]
+						So(err, ShouldNotBeNil)
+					})
+					Convey("decrypt should fail if the ciphertext has been changed", func() {
+						if len(ciphertext) == 0 {
+							ciphertext = append(ciphertext, 0)
+						} else {
+							ciphertext[0]++
+						}
+						ciphertext = append(ciphertext, 0)
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						if len(ciphertext) == 0 {
+							ciphertext = ciphertext[0 : len(ciphertext)-1]
+						} else {
+							ciphertext[0]--
+						}
+						So(err, ShouldNotBeNil)
+					})
+					Convey("decrypt should fail if the wrong key is used", func() {
+						key[0]++
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						key[0]--
+						So(err, ShouldNotBeNil)
+					})
+					Convey("decrypt should fail if the wrong nonce is used", func() {
+						nonce[0]++
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						nonce[0]--
+						So(err, ShouldNotBeNil)
+					})
+					Convey("ciphertext should match ciphertext from general McOEJ object", func() {
+						mcgen, _ := mcoej.New(tf256.Encrypt, tf256.Decrypt, 256)
+						ciphertext2 := mcgen.Lock(key, nonce, publicData, plaintext, nil)
+						So(ciphertext, ShouldResemble, ciphertext2)
+					})
+				})
+			}
+		}
+	})
+}
+
 func TestMcOEJ512(t *testing.T) {
 	Convey("mcoej 512", t, func() {
 		datas := [][]byte{
@@ -166,6 +238,78 @@ func TestMcOEJ512(t *testing.T) {
 	})
 }
 
+func TestMcOEJ1024(t *testing.T) {
+	Convey("mcoej 1024", t, func() {
+		datas := [][]byte{
+			[]byte(""),
+			[]byte("Data"),
+			[]byte("lessthan128bits"),
+			[]byte("exactly 128 bits"),
+			[]byte("morethan 128 bits"),
+			[]byte("less than 256 bits-------------"),
+			[]byte("exactly 256 bits----------------"),
+			[]byte("more than 256 bits---------------"),
+			[]byte("This is a bunch of data, just to make sure it is longer than the other things."),
+		}
+		mc := mcoej.New1024()
+		So(mc, ShouldNotBeNil)
+		key := make([]byte, 128)
+		nonce := make([]byte, 128)
+		key[0], key[1], key[2] = 10, 20, 30
+		nonce[0], nonce[1], nonce[2] = 40, 50, 60
+		for _, publicData := range datas {
+			for _, plaintext := range datas {
+				Convey(fmt.Sprintf("public data: %q, plaintext: %q", publicData, plaintext), func() {
+					ciphertext := mc.Lock(key, nonce, publicData, plaintext, nil)
+					Convey("decrypt should reverse encryption", func() {
+						output, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						So(err, ShouldBeNil)
+						So(output, ShouldResemble, plaintext)
+					})
+					Convey("decrypt should fail if the public data has been changed", func() {
+						publicData = append(publicData, 0)
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						publicData = publicData[0 : len(publicData)-1]
+						So(err, ShouldNotBeNil)
+					})
+					Convey("decrypt should fail if the ciphertext has been changed", func() {
+						if len(ciphertext) == 0 {
+							ciphertext = append(ciphertext, 0)
+						} else {
+							ciphertext[0]++
+						}
+						ciphertext = append(ciphertext, 0)
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						if len(ciphertext) == 0 {
+							ciphertext = ciphertext[0 : len(ciphertext)-1]
+						} else {
+							ciphertext[0]--
+						}
+						So(err, ShouldNotBeNil)
+					})
+					Convey("decrypt should fail if the wrong key is used", func() {
+						key[0]++
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						key[0]--
+						So(err, ShouldNotBeNil)
+					})
+					Convey("decrypt should fail if the wrong nonce is used", func() {
+						nonce[0]++
+						_, err := mc.Unlock(key, nonce, publicData, ciphertext, nil)
+						nonce[0]--
+						So(err, ShouldNotBeNil)
+					})
+					Convey("ciphertext should match ciphertext from general McOEJ object", func() {
+						mcgen, _ := mcoej.New(tf1024.Encrypt, tf1024.Decrypt, 1024)
+						ciphertext2 := mcgen.Lock(key, nonce, publicData, plaintext, nil)
+						So(ciphertext, ShouldResemble, ciphertext2)
+					})
+				})
+			}
+		}
+	})
+}
+
 var (
 	benchmarkPublicData   []byte
 	benchmarkPlaintext32b []byte
@@ -219,6 +363,36 @@ func BenchmarkMcOEJUnlock_32b(b *testing.B) {
 	}
 }
 
+func BenchmarkMcOEJ256Lock_32b(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New256()
+	key := [32]byte{0, 1, 2, 3, 4, 5}
+	nonce := [32]byte{5, 4, 3, 2, 1}
+	dst := make([]byte, 1000)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext32b, dst[0:0])
+	}
+}
+
+func BenchmarkMcOEJ256Unlock_32b(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New256()
+	key := [32]byte{0, 1, 2, 3, 4, 5}
+	nonce := [32]byte{5, 4, 3, 2, 1}
+
+	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext32b, nil)
+	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
+		panic(err)
+	}
+	dst := make([]byte, 1000)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, dst[0:0])
+	}
+}
+
 func BenchmarkMcOEJ512Lock_32b(b *testing.B) {
 	b.StopTimer()
 	mc := mcoej.New512()
@@ -237,6 +411,36 @@ func BenchmarkMcOEJ512Unlock_32b(b *testing.B) {
 	mc := mcoej.New512()
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
+
+	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext32b, nil)
+	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
+		panic(err)
+	}
+	dst := make([]byte, 1000)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, dst[0:0])
+	}
+}
+
+func BenchmarkMcOEJ1024Lock_32b(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New1024()
+	key := [128]byte{0, 1, 2, 3, 4, 5}
+	nonce := [128]byte{5, 4, 3, 2, 1}
+	dst := make([]byte, 1000)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext32b, dst[0:0])
+	}
+}
+
+func BenchmarkMcOEJ1024Unlock_32b(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New1024()
+	key := [128]byte{0, 1, 2, 3, 4, 5}
+	nonce := [128]byte{5, 4, 3, 2, 1}
 
 	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext32b, nil)
 	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
@@ -320,6 +524,34 @@ func BenchmarkMcOEJUnlock_1k(b *testing.B) {
 	}
 }
 
+func BenchmarkMcOEJ256Lock_1k(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New256()
+	key := [32]byte{0, 1, 2, 3, 4, 5}
+	nonce := [32]byte{5, 4, 3, 2, 1}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1k, nil)
+	}
+}
+
+func BenchmarkMcOEJ256Unlock_1k(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New256()
+	key := [32]byte{0, 1, 2, 3, 4, 5}
+	nonce := [32]byte{5, 4, 3, 2, 1}
+
+	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1k, nil)
+	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
+		panic(err)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil)
+	}
+}
+
 func BenchmarkMcOEJ512Lock_1k(b *testing.B) {
 	b.StopTimer()
 	mc := mcoej.New512()
@@ -337,6 +569,34 @@ func BenchmarkMcOEJ512Unlock_1k(b *testing.B) {
 	mc := mcoej.New512()
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
+
+	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1k, nil)
+	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
+		panic(err)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil)
+	}
+}
+
+func BenchmarkMcOEJ1024Lock_1k(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New1024()
+	key := [128]byte{0, 1, 2, 3, 4, 5}
+	nonce := [128]byte{5, 4, 3, 2, 1}
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1k, nil)
+	}
+}
+
+func BenchmarkMcOEJ1024Unlock_1k(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New1024()
+	key := [128]byte{0, 1, 2, 3, 4, 5}
+	nonce := [128]byte{5, 4, 3, 2, 1}
 
 	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1k, nil)
 	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
@@ -419,6 +679,34 @@ func BenchmarkMcOEJUnlock_1M(b *testing.B) {
 	}
 }
 
+func BenchmarkMcOEJ256Lock_1M(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New256()
+	key := [32]byte{0, 1, 2, 3, 4, 5}
+	nonce := [32]byte{5, 4, 3, 2, 1}
+	var dst []byte
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		dst = mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1M, dst[0:0])
+	}
+}
+
+func BenchmarkMcOEJ256Unlock_1M(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New256()
+	key := [32]byte{0, 1, 2, 3, 4, 5}
+	nonce := [32]byte{5, 4, 3, 2, 1}
+
+	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1M, nil)
+	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
+		panic(err)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil)
+	}
+}
+
 func BenchmarkMcOEJ512Lock_1M(b *testing.B) {
 	b.StopTimer()
 	mc := mcoej.New512()
@@ -436,6 +724,34 @@ func BenchmarkMcOEJ512Unlock_1M(b *testing.B) {
 	mc := mcoej.New512()
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
+
+	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1M, nil)
+	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
+		panic(err)
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil)
+	}
+}
+
+func BenchmarkMcOEJ1024Lock_1M(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New1024()
+	key := [128]byte{0, 1, 2, 3, 4, 5}
+	nonce := [128]byte{5, 4, 3, 2, 1}
+	var dst []byte
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		dst = mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1M, dst[0:0])
+	}
+}
+
+func BenchmarkMcOEJ1024Unlock_1M(b *testing.B) {
+	b.StopTimer()
+	mc := mcoej.New1024()
+	key := [128]byte{0, 1, 2, 3, 4, 5}
+	nonce := [128]byte{5, 4, 3, 2, 1}
 
 	ciphertext := mc.Lock(key[:], nonce[:], benchmarkPublicData, benchmarkPlaintext1M, nil)
 	if _, err := mc.Unlock(key[:], nonce[:], benchmarkPublicData, ciphertext, nil); err != nil {
