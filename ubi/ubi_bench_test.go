@@ -42,11 +42,20 @@ func BenchmarkSkein_1024_256_16B(b *testing.B) {
 
 func BenchmarkSha3_256_16B(b *testing.B) {
 	b.StopTimer()
-	s := sha3.New256()
 	msg := make([]byte, 16)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sum(msg)
+		sha3.Sum256(msg)
+	}
+}
+
+func BenchmarkShake_256_16B(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 16)
+	out := make([]byte, 256)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sha3.ShakeSum256(msg, out)
 	}
 }
 
@@ -82,11 +91,20 @@ func BenchmarkSkein_1024_256_1k(b *testing.B) {
 
 func BenchmarkSha3_256_1k(b *testing.B) {
 	b.StopTimer()
-	s := sha3.New256()
 	msg := make([]byte, 1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sum(msg)
+		sha3.Sum256(msg)
+	}
+}
+
+func BenchmarkShake_256_1k(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 1024)
+	out := make([]byte, 256)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sha3.ShakeSum256(msg, out)
 	}
 }
 
@@ -122,10 +140,19 @@ func BenchmarkSkein_1024_256_1M(b *testing.B) {
 
 func BenchmarkSha3_256_1M(b *testing.B) {
 	b.StopTimer()
-	s := sha3.New256()
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		s.Sum(msg)
+		sha3.Sum256(msg)
+	}
+}
+
+func BenchmarkShake_256_1M(b *testing.B) {
+	b.StopTimer()
+	msg := make([]byte, 1024*1024)
+	out := make([]byte, 256)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		sha3.ShakeSum256(msg, out)
 	}
 }
