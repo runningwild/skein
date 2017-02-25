@@ -42,6 +42,25 @@ func (c *Cipher) Decrypt(dst, src []byte) {
 	decrypt1024(convert.Inplace128BytesToUInt64(dst), &c.key, &c.tweak)
 }
 
+// TweakableBlockCipher implements types.TweakableBlockCipher.
+type TweakableBlockCipher struct{}
+
+func (t TweakableBlockCipher) Encrypt(data []byte, key []byte, tweak []byte) {
+	Encrypt(data, key, tweak)
+}
+
+func (t TweakableBlockCipher) Decrypt(data []byte, key []byte, tweak []byte) {
+	Decrypt(data, key, tweak)
+}
+
+func (t TweakableBlockCipher) BlockSize() int {
+	return 1024
+}
+
+func (t TweakableBlockCipher) TweakSize() int {
+	return 128
+}
+
 // Encrypt encrypts a single block of 128 bytes in place using key and tweak.  The actual key
 // itself should be contained in the first 128 bytes of key, the rest is used internally.  Similarly,
 // the tweak should be contained in the first two elements of tweak, the third value is used internally.

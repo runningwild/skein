@@ -1,9 +1,9 @@
 package skein
 
 import (
-	skein1024 "github.com/runningwild/skein/hash/1024"
-	skein256 "github.com/runningwild/skein/hash/256"
-	skein512 "github.com/runningwild/skein/hash/512"
+	skein1024 "github.com/runningwild/skein/skein/1024"
+	skein256 "github.com/runningwild/skein/skein/256"
+	skein512 "github.com/runningwild/skein/skein/512"
 )
 
 var (

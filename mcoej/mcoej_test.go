@@ -10,6 +10,7 @@ import (
 	tf1024 "github.com/runningwild/skein/threefish/1024"
 	tf256 "github.com/runningwild/skein/threefish/256"
 	tf512 "github.com/runningwild/skein/threefish/512"
+	"github.com/runningwild/skein/types"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -17,12 +18,12 @@ import (
 func TestMcOEJ(t *testing.T) {
 	Convey("mcoej", t, func() {
 		tests := []struct {
-			enc, dec mcoej.TweakableBlockCipher
-			size     int
+			tbc  types.TweakableBlockCipher
+			size int
 		}{
-			{tf256.Encrypt, tf256.Decrypt, 256},
-			{tf512.Encrypt, tf512.Decrypt, 512},
-			{tf1024.Encrypt, tf1024.Decrypt, 1024},
+			{tf256.TweakableBlockCipher{}, 256},
+			{tf512.TweakableBlockCipher{}, 512},
+			{tf1024.TweakableBlockCipher{}, 1024},
 		}
 		datas := [][]byte{
 			[]byte(""),
@@ -37,7 +38,7 @@ func TestMcOEJ(t *testing.T) {
 		}
 		for _, test := range tests {
 			Convey(fmt.Sprintf("with tf %d", test.size), func() {
-				mc, err := mcoej.New(test.enc, test.dec, test.size)
+				mc, err := mcoej.New(test.tbc)
 				So(err, ShouldBeNil)
 				So(mc, ShouldNotBeNil)
 				key := make([]byte, test.size/8)
@@ -156,7 +157,7 @@ func TestMcOEJ256(t *testing.T) {
 						So(err, ShouldNotBeNil)
 					})
 					Convey("ciphertext should match ciphertext from general McOEJ object", func() {
-						mcgen, _ := mcoej.New(tf256.Encrypt, tf256.Decrypt, 256)
+						mcgen, _ := mcoej.New(tf256.TweakableBlockCipher{})
 						ciphertext2 := mcgen.Lock(key, nonce, publicData, plaintext, nil)
 						So(ciphertext, ShouldResemble, ciphertext2)
 					})
@@ -228,7 +229,7 @@ func TestMcOEJ512(t *testing.T) {
 						So(err, ShouldNotBeNil)
 					})
 					Convey("ciphertext should match ciphertext from general McOEJ object", func() {
-						mcgen, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
+						mcgen, _ := mcoej.New(tf512.TweakableBlockCipher{})
 						ciphertext2 := mcgen.Lock(key, nonce, publicData, plaintext, nil)
 						So(ciphertext, ShouldResemble, ciphertext2)
 					})
@@ -300,7 +301,7 @@ func TestMcOEJ1024(t *testing.T) {
 						So(err, ShouldNotBeNil)
 					})
 					Convey("ciphertext should match ciphertext from general McOEJ object", func() {
-						mcgen, _ := mcoej.New(tf1024.Encrypt, tf1024.Decrypt, 1024)
+						mcgen, _ := mcoej.New(tf1024.TweakableBlockCipher{})
 						ciphertext2 := mcgen.Lock(key, nonce, publicData, plaintext, nil)
 						So(ciphertext, ShouldResemble, ciphertext2)
 					})
@@ -335,7 +336,7 @@ func init() {
 
 func BenchmarkMcOEJLock_32b(b *testing.B) {
 	b.StopTimer()
-	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
+	mc, _ := mcoej.New(tf512.TweakableBlockCipher{})
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
 	dst := make([]byte, 1000)
@@ -348,7 +349,7 @@ func BenchmarkMcOEJLock_32b(b *testing.B) {
 
 func BenchmarkMcOEJUnlock_32b(b *testing.B) {
 	b.StopTimer()
-	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
+	mc, _ := mcoej.New(tf512.TweakableBlockCipher{})
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
 
@@ -498,7 +499,7 @@ func BenchmarkAESGCMSeal_32b(b *testing.B) {
 
 func BenchmarkMcOEJLock_1k(b *testing.B) {
 	b.StopTimer()
-	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
+	mc, _ := mcoej.New(tf512.TweakableBlockCipher{})
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
 
@@ -510,7 +511,7 @@ func BenchmarkMcOEJLock_1k(b *testing.B) {
 
 func BenchmarkMcOEJUnlock_1k(b *testing.B) {
 	b.StopTimer()
-	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
+	mc, _ := mcoej.New(tf512.TweakableBlockCipher{})
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
 
@@ -653,7 +654,7 @@ func BenchmarkAESGCMSeal_1k(b *testing.B) {
 
 func BenchmarkMcOEJLock_1M(b *testing.B) {
 	b.StopTimer()
-	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
+	mc, _ := mcoej.New(tf512.TweakableBlockCipher{})
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
 	var dst []byte
@@ -665,7 +666,7 @@ func BenchmarkMcOEJLock_1M(b *testing.B) {
 
 func BenchmarkMcOEJUnlock_1M(b *testing.B) {
 	b.StopTimer()
-	mc, _ := mcoej.New(tf512.Encrypt, tf512.Decrypt, 512)
+	mc, _ := mcoej.New(tf512.TweakableBlockCipher{})
 	key := [64]byte{0, 1, 2, 3, 4, 5}
 	nonce := [64]byte{5, 4, 3, 2, 1}
 

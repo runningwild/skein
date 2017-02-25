@@ -13,7 +13,7 @@ var (
 
 func init() {
 	var err error
-	if u, err = ubi.New(threefish.Encrypt, 1024); err != nil {
+	if u, err = ubi.New(threefish.TweakableBlockCipher{}); err != nil {
 		panic(fmt.Sprintf("failed to create ubi object: %v", err))
 	}
 }

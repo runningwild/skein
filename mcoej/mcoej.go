@@ -5,11 +5,15 @@ import (
 	"fmt"
 
 	"github.com/runningwild/skein/convert"
-	"github.com/runningwild/skein/ubi"
+	"github.com/runningwild/skein/types"
 )
 
-func New(enc, dec TweakableBlockCipher, blockSize int) (*McOEJ, error) {
-	switch blockSize {
+func New(tbc types.TweakableBlockCipher) (*McOEJ, error) {
+	if tbc.TweakSize() != 128 {
+		return nil, fmt.Errorf("only tweak size 128 is supported")
+	}
+
+	switch tbc.BlockSize() {
 	case 256:
 	case 512:
 	case 1024:
@@ -17,34 +21,24 @@ func New(enc, dec TweakableBlockCipher, blockSize int) (*McOEJ, error) {
 		return nil, fmt.Errorf("only block sizes 256, 512, and 1024 are supported")
 	}
 
-	skein, err := ubi.New(ubi.TweakableBlockCipher(enc), blockSize)
-	if err != nil {
-		return nil, fmt.Errorf("unable to make UBI: %v", err)
-	}
-
 	return &McOEJ{
-		enc:            enc,
-		dec:            dec,
-		blockSize:      blockSize,
-		blockBytes:     blockSize / 8,
-		blockBytesMask: blockSize/8 - 1,
-		blockUint64s:   blockSize / 64,
-		skein:          skein,
-		ft:             &fullTweak{data: make([]byte, blockSize/8), mask: blockSize/8 - 1},
-		blockBuf:       make([]byte, blockSize/8),
-		fullKey:        make([]byte, blockSize/8+8),
+		tbc:            tbc,
+		blockSize:      tbc.BlockSize(),
+		blockBytes:     tbc.BlockSize() / 8,
+		blockBytesMask: tbc.BlockSize()/8 - 1,
+		blockUint64s:   tbc.BlockSize() / 64,
+		ft:             &fullTweak{data: make([]byte, tbc.BlockSize()/8), mask: tbc.BlockSize()/8 - 1},
+		blockBuf:       make([]byte, tbc.BlockSize()/8),
+		fullKey:        make([]byte, tbc.BlockSize()/8+8),
 	}, nil
 }
 
-type TweakableBlockCipher func(data []byte, key []byte, tweak []byte)
-
 type McOEJ struct {
-	enc, dec       TweakableBlockCipher
+	tbc            types.TweakableBlockCipher
 	blockSize      int
 	blockBytes     int
 	blockBytesMask int
 	blockUint64s   int
-	skein          *ubi.UBI
 	ft             *fullTweak
 	blockBuf       []byte
 	fullKey        []byte
@@ -109,7 +103,7 @@ func (j *McOEJ) Lock(key, nonce, publicData, plaintext, dst []byte) []byte {
 	for len(target) > j.blockBytes {
 		tweak := j.ft.Next()
 		j.ft.Xor(target[0:j.blockBytes])
-		j.enc(target[0:j.blockBytes], j.fullKey, tweak)
+		j.tbc.Encrypt(target[0:j.blockBytes], j.fullKey, tweak)
 		j.ft.Xor(target[0:j.blockBytes])
 		target = target[j.blockBytes:]
 	}
@@ -120,7 +114,7 @@ func (j *McOEJ) Lock(key, nonce, publicData, plaintext, dst []byte) []byte {
 	} else {
 		target[j.blockBytes-16] = byte(j.blockBytes)
 	}
-	j.enc(target, j.fullKey, finalTweak)
+	j.tbc.Encrypt(target, j.fullKey, finalTweak)
 	return dst
 }
 
@@ -153,13 +147,13 @@ func (j *McOEJ) Unlock(key, nonce, publicData, ciphertext, dst []byte) ([]byte, 
 	for len(target) > j.blockBytes {
 		tweak := j.ft.Next()
 		j.ft.Xor(target[0:j.blockBytes])
-		j.dec(target[0:j.blockBytes], j.fullKey, tweak[:])
+		j.tbc.Decrypt(target[0:j.blockBytes], j.fullKey, tweak[:])
 		j.ft.Xor(target[0:j.blockBytes])
 		target = target[j.blockBytes:]
 	}
 	finalTweak := j.ft.Next()
 	remainder := j.ft.Remainder()
-	j.dec(target, j.fullKey, finalTweak)
+	j.tbc.Decrypt(target, j.fullKey, finalTweak)
 	if subtle.ConstantTimeCompare(target[0:len(remainder)], remainder) != 1 {
 		return nil, fmt.Errorf("authentication failed")
 	}
@@ -171,7 +165,7 @@ func (j *McOEJ) Unlock(key, nonce, publicData, ciphertext, dst []byte) ([]byte, 
 func (j *McOEJ) processPublicData(key, publicData []byte) {
 	for len(publicData) >= j.blockBytes {
 		copy(j.blockBuf, publicData)
-		j.enc(j.blockBuf, key, j.ft.Next())
+		j.tbc.Encrypt(j.blockBuf, key, j.ft.Next())
 		j.ft.Xor(j.blockBuf)
 		publicData = publicData[j.blockBytes:]
 	}
@@ -180,6 +174,6 @@ func (j *McOEJ) processPublicData(key, publicData []byte) {
 	for i := len(publicData) + 1; i < len(j.blockBuf); i++ {
 		j.blockBuf[i] = 0
 	}
-	j.enc(j.blockBuf, key, j.ft.Next())
+	j.tbc.Encrypt(j.blockBuf, key, j.ft.Next())
 	j.ft.Xor(j.blockBuf)
 }

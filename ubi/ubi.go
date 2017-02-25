@@ -2,20 +2,20 @@ package ubi
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/runningwild/skein/convert"
+	"github.com/runningwild/skein/types"
 )
 
-type TweakableBlockCipher func(data []byte, key []byte, tweak []byte)
-
-func New(tbc TweakableBlockCipher, blockSize int) (*UBI, error) {
-	if blockSize <= 0 || blockSize%8 != 0 {
-		return nil, fmt.Errorf("blockSize must be a positive multiple of 8")
+func New(tbc types.TweakableBlockCipher) (*UBI, error) {
+	if tbc.TweakSize() != 128 {
+		return nil, fmt.Errorf("only tweak size 128 is supported")
 	}
 
 	var convertBlockBytesToUint64 func([]byte) []uint64
 	var convertBlockUint64ToBytes func([]uint64) []byte
-	switch blockSize {
+	switch tbc.BlockSize() {
 	case 256:
 		convertBlockBytesToUint64 = func(b []byte) []uint64 {
 			return convert.Inplace32BytesToUInt64(b)[:]
@@ -46,17 +46,17 @@ func New(tbc TweakableBlockCipher, blockSize int) (*UBI, error) {
 
 	return &UBI{
 		tbc:                       tbc,
-		blockSize:                 blockSize,
-		blockBytes:                blockSize / 8,
-		blockUint64s:              blockSize / 64,
+		blockSize:                 tbc.BlockSize(),
+		blockBytes:                tbc.BlockSize() / 8,
+		blockUint64s:              tbc.BlockSize() / 64,
 		convertBlockBytesToUint64: convertBlockBytesToUint64,
 		convertBlockUint64ToBytes: convertBlockUint64ToBytes,
-		Gs: make(map[uint64][]byte),
+		gs: make(map[uint64][]byte),
 	}, nil
 }
 
 type UBI struct {
-	tbc          TweakableBlockCipher
+	tbc          types.TweakableBlockCipher
 	blockSize    int
 	blockBytes   int
 	blockUint64s int
@@ -64,7 +64,8 @@ type UBI struct {
 	convertBlockBytesToUint64 func([]byte) []uint64
 	convertBlockUint64ToBytes func([]uint64) []byte
 
-	Gs map[uint64][]byte
+	mu sync.RWMutex
+	gs map[uint64][]byte
 }
 
 func (ubi *UBI) UBI(G []byte, M []byte, Ts [2]uint64) []byte {
@@ -117,8 +118,8 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 		// Here we aren't supporting sizes over 2^64, even though the spec supports up to 2^96.
 		tweak[0] += uint64(ubi.blockBytes)
 
-		ubi.tbc(state, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
-		convert.Xor(H[0:ubi.blockBytes], M[0:ubi.blockBytes], state)
+		ubi.tbc.Encrypt(state, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
+		convert.XorBytes(H[0:ubi.blockBytes], M[0:ubi.blockBytes], state)
 		M = M[ubi.blockBytes:]
 		tweak[1] &^= (1 << (126 - 64)) // unset the 'first' bit
 	}
@@ -135,7 +136,7 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 	}
 	block64 := ubi.convertBlockBytesToUint64(lastBlock)
 	copy(state64, block64)
-	ubi.tbc(lastBlock, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
+	ubi.tbc.Encrypt(lastBlock, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
 	convert.Xor(H[0:ubi.blockBytes], lastBlock, state)
 	return H[0:ubi.blockBytes]
 }
@@ -177,7 +178,9 @@ func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
 		}, [2]uint64{0, 4 << (120 - 64)})
 	} else {
 		var ok bool
-		G0, ok = ubi.Gs[N]
+		ubi.mu.RLock()
+		G0, ok = ubi.gs[N]
+		ubi.mu.RUnlock()
 		if !ok {
 			G0 = ubi.UBI(make([]byte, ubi.blockBytes), []byte{
 				0x53, 0x48, 0x41, 0x33, // SHA3
@@ -187,7 +190,9 @@ func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
 				0x00, 0x00, 0x00, // Tree params
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
 			}, [2]uint64{0, 4 << (120 - 64)})
-			ubi.Gs[N] = G0
+			ubi.mu.Lock()
+			ubi.gs[N] = G0
+			ubi.mu.Unlock()
 		}
 	}
 	var Gn []byte = G0

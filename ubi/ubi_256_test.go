@@ -11,7 +11,7 @@ import (
 
 func TestSkein256(t *testing.T) {
 	Convey("ubi.Skein 256", t, func() {
-		u, err := ubi.New(threefish.Encrypt, 256)
+		u, err := ubi.New(threefish.TweakableBlockCipher{})
 		So(err, ShouldBeNil)
 
 		Convey("doesn't corrupt input message", func() {
