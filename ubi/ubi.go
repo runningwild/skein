@@ -55,7 +55,7 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 		it.Block(M[0:ubi.blockBytes])
 		M = M[ubi.blockBytes:]
 	}
-	return it.FinishSafe(M, lastByteBits)
+	return it.Finish(M, lastByteBits)
 }
 
 type Iterator struct {
@@ -113,24 +113,6 @@ func (it *Iterator) Block(M []byte) {
 }
 
 func (it *Iterator) Finish(M []byte, lastByteBits int) []byte {
-	it.tweak[0] += uint64(len(M))
-	it.tweak[1] |= (1 << (127 - 64)) // set the 'last' bit
-	lastBlock := make([]byte, it.ubi.blockBytes)
-	copy(lastBlock, M)
-	if lastByteBits != 0 {
-		it.tweak[1] |= (1 << (119 - 64)) // set the 'bitpad' bit
-		b := lastBlock[len(M)-1]
-		var lastUsedBit byte = 1 << uint(7-lastByteBits+1)
-		b = (b &^ (lastUsedBit - 1)) | (lastUsedBit >> 1)
-		lastBlock[len(M)-1] = b
-	}
-	copy(it.buf, lastBlock)
-	it.ubi.tbc.Encrypt(lastBlock, it.h, it.tweakBytes)
-	convert.Xor(it.h[0:it.ubi.blockBytes], lastBlock, it.buf)
-	return it.h[0:it.ubi.blockBytes]
-}
-
-func (it *Iterator) FinishSafe(M []byte, lastByteBits int) []byte {
 	var tweak [3]uint64
 	copy(tweak[:], it.tweak)
 	tweak[0] += uint64(len(M))
@@ -198,7 +180,7 @@ func (h *hasher) Write(b []byte) (n int, err error) {
 	return written, nil
 }
 func (h *hasher) Sum(b []byte) []byte {
-	Gn := h.it.FinishSafe(h.buf, 0)
+	Gn := h.it.Finish(h.buf, 0)
 
 	buf := make([]byte, int(h.n)/8+h.ubi.blockBytes)
 	view := buf[:]
