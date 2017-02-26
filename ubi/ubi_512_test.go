@@ -22,6 +22,29 @@ func TestSkein512(t *testing.T) {
 			}
 		})
 
+		Convey("hasher object matches stand-alone function", func() {
+			for _, length := range []int{0, 1, 2, 63, 64, 65, 127, 128, 129, 1000, 1024 * 1024} {
+				b := make([]byte, length)
+				for i := range b {
+					b[i] = byte(i)
+				}
+				for _, N := range []int{64, 256, 512, 1000} {
+					h := u.NewHasher(N)
+					expected := u.Hash(b, len(b)*8, uint64(N))
+					for _, amt := range []int{1, 2, 10, 32, 63, 64, 65, 100} {
+						buf := b
+						for len(buf) > amt {
+							h.Write(buf[0:amt])
+							buf = buf[amt:]
+						}
+						h.Write(buf)
+						So(h.Sum(nil), ShouldResemble, expected)
+						h.Reset()
+					}
+				}
+			}
+		})
+
 		Convey("passes hash test vectors", func() {
 			So(u.Hash([]byte{}, 0, 512), ShouldResemble, []byte{
 				0xBC, 0x5B, 0x4C, 0x50, 0x92, 0x55, 0x19, 0xC2, 0x90, 0xCC, 0x63, 0x42, 0x77, 0xAE, 0x3D, 0x62,
