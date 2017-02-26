@@ -13,45 +13,20 @@ func New(tbc types.TweakableBlockCipher) (*UBI, error) {
 		return nil, fmt.Errorf("only tweak size 128 is supported")
 	}
 
-	var convertBlockBytesToUint64 func([]byte) []uint64
-	var convertBlockUint64ToBytes func([]uint64) []byte
 	switch tbc.BlockSize() {
 	case 256:
-		convertBlockBytesToUint64 = func(b []byte) []uint64 {
-			return convert.Inplace32BytesToUInt64(b)[:]
-		}
-		convertBlockUint64ToBytes = func(v []uint64) []byte {
-			return convert.Inplace4Uint64ToBytes(v)[:]
-		}
-
 	case 512:
-		convertBlockBytesToUint64 = func(b []byte) []uint64 {
-			return convert.Inplace64BytesToUInt64(b)[:]
-		}
-		convertBlockUint64ToBytes = func(v []uint64) []byte {
-			return convert.Inplace8Uint64ToBytes(v)[:]
-		}
-
 	case 1024:
-		convertBlockBytesToUint64 = func(b []byte) []uint64 {
-			return convert.Inplace128BytesToUInt64(b)[:]
-		}
-		convertBlockUint64ToBytes = func(v []uint64) []byte {
-			return convert.Inplace16Uint64ToBytes(v)[:]
-		}
-
 	default:
 		return nil, fmt.Errorf("only block sizes 256, 512, and 1024 are supported")
 	}
 
 	return &UBI{
-		tbc:                       tbc,
-		blockSize:                 tbc.BlockSize(),
-		blockBytes:                tbc.BlockSize() / 8,
-		blockUint64s:              tbc.BlockSize() / 64,
-		convertBlockBytesToUint64: convertBlockBytesToUint64,
-		convertBlockUint64ToBytes: convertBlockUint64ToBytes,
-		gs: make(map[uint64][]byte),
+		tbc:          tbc,
+		blockSize:    tbc.BlockSize(),
+		blockBytes:   tbc.BlockSize() / 8,
+		blockUint64s: tbc.BlockSize() / 64,
+		gs:           make(map[uint64][]byte),
 	}, nil
 }
 
@@ -60,9 +35,6 @@ type UBI struct {
 	blockSize    int
 	blockBytes   int
 	blockUint64s int
-
-	convertBlockBytesToUint64 func([]byte) []uint64
-	convertBlockUint64ToBytes func([]uint64) []byte
 
 	mu sync.RWMutex
 	gs map[uint64][]byte
@@ -89,56 +61,66 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 		panic("cannot call UBI with the Final field set on Ts")
 	}
 
-	var tweak [3]uint64
+	state := ubi.start(G, Ts)
+	for len(M) > ubi.blockBytes {
+		ubi.block(state, M[0:ubi.blockBytes])
+		M = M[ubi.blockBytes:]
+	}
+	return ubi.finish(state, M, lastByteBits)
+}
+
+type ubiState struct {
+	tweak      []uint64
+	tweakBytes []byte
+	H          []byte
+	buf        []byte
+}
+
+func (ubi *UBI) start(G []byte, Ts [2]uint64) *ubiState {
+	tweak := make([]uint64, 3)
 	tweak[1] = Ts[1] | (1 << (126 - 64)) // set the 'first' bit
+	tweakBytes := convert.Inplace3Uint64ToBytes(tweak)[:]
 
 	H := make([]byte, len(G)+8)
 	copy(H, G)
 
-	// Figure out how much belongs in the 'last' block.  There must be a last block, even if it's
-	// zero bits.
-	rem := len(M) % ubi.blockBytes
-	if rem == 0 {
-		rem = ubi.blockBytes
-		if rem > len(M) {
-			rem = len(M)
-		}
+	buf := make([]byte, ubi.blockBytes)
+
+	return &ubiState{
+		tweak:      tweak,
+		tweakBytes: tweakBytes,
+		H:          H,
+		buf:        buf,
 	}
+}
+
+func (ubi *UBI) block(state *ubiState, M []byte) {
+	copy(state.buf, M)
+
+	// Here we aren't supporting sizes over 2^64, even though the spec supports up to 2^96.
+	state.tweak[0] += uint64(ubi.blockBytes)
+
+	ubi.tbc.Encrypt(state.buf, state.H, state.tweakBytes)
+	convert.XorBytes(state.H[0:ubi.blockBytes], M, state.buf)
+	state.tweak[1] &^= (1 << (126 - 64)) // unset the 'first' bit
+}
+
+func (ubi *UBI) finish(state *ubiState, M []byte, lastByteBits int) []byte {
+	state.tweak[0] += uint64(len(M))
+	state.tweak[1] |= (1 << (127 - 64)) // set the 'last' bit
 	lastBlock := make([]byte, ubi.blockBytes)
-	copy(lastBlock, M[len(M)-rem:])
-	M = M[0 : len(M)-rem]
-
-	state64 := make([]uint64, ubi.blockUint64s)
-	state := ubi.convertBlockUint64ToBytes(state64)
-	// Process every full block except the last.
-	for len(M) > 0 {
-		M64 := ubi.convertBlockBytesToUint64(M[0:ubi.blockBytes])
-		copy(state64, M64)
-
-		// Here we aren't supporting sizes over 2^64, even though the spec supports up to 2^96.
-		tweak[0] += uint64(ubi.blockBytes)
-
-		ubi.tbc.Encrypt(state, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
-		convert.XorBytes(H[0:ubi.blockBytes], M[0:ubi.blockBytes], state)
-		M = M[ubi.blockBytes:]
-		tweak[1] &^= (1 << (126 - 64)) // unset the 'first' bit
-	}
-
-	// Process the last block.
-	tweak[0] += uint64(rem)
-	tweak[1] |= (1 << (127 - 64)) // set the 'last' bit
+	copy(lastBlock, M)
 	if lastByteBits != 0 {
-		tweak[1] |= (1 << (119 - 64)) // set the 'bitpad' bit
-		b := lastBlock[rem-1]
+		state.tweak[1] |= (1 << (119 - 64)) // set the 'bitpad' bit
+		b := lastBlock[len(M)-1]
 		var lastUsedBit byte = 1 << uint(7-lastByteBits+1)
 		b = (b &^ (lastUsedBit - 1)) | (lastUsedBit >> 1)
-		lastBlock[rem-1] = b
+		lastBlock[len(M)-1] = b
 	}
-	block64 := ubi.convertBlockBytesToUint64(lastBlock)
-	copy(state64, block64)
-	ubi.tbc.Encrypt(lastBlock, H, convert.Inplace3Uint64ToBytes(tweak[:])[:])
-	convert.Xor(H[0:ubi.blockBytes], lastBlock, state)
-	return H[0:ubi.blockBytes]
+	copy(state.buf, lastBlock)
+	ubi.tbc.Encrypt(lastBlock, state.H, state.tweakBytes)
+	convert.Xor(state.H[0:ubi.blockBytes], lastBlock, state.buf)
+	return state.H[0:ubi.blockBytes]
 }
 
 func (ubi *UBI) Hash(M []byte, MBits int, N uint64) []byte {
