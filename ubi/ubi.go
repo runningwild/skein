@@ -151,6 +151,18 @@ func (ubi *UBI) NewHasher(N int) hash.Hash {
 	return h
 }
 
+func (ubi *UBI) NewMACer(key []byte, N int) hash.Hash {
+	h := &hasher{
+		ubi: ubi,
+		buf: make([]byte, ubi.blockBytes)[0:0],
+		key: make([]byte, len(key)),
+		n:   uint64(N),
+	}
+	copy(h.key, key)
+	h.Reset()
+	return h
+}
+
 func (h *hasher) Write(b []byte) (n int, err error) {
 	written := len(b)
 
