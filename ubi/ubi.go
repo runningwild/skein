@@ -2,7 +2,6 @@ package ubi
 
 import (
 	"fmt"
-	"hash"
 	"sync"
 
 	"github.com/runningwild/skein/convert"
@@ -133,16 +132,8 @@ func (it *Iterator) Finish(M []byte, lastByteBits int) []byte {
 	return lastBlock
 }
 
-type hasher struct {
-	ubi *UBI
-	buf []byte
-	key []byte
-	n   uint64
-	it  *Iterator
-}
-
-func (ubi *UBI) NewHasher(N int) hash.Hash {
-	h := &hasher{
+func (ubi *UBI) NewHasher(N int) *Hasher {
+	h := &Hasher{
 		ubi: ubi,
 		buf: make([]byte, ubi.blockBytes)[0:0],
 		n:   uint64(N),
@@ -151,8 +142,8 @@ func (ubi *UBI) NewHasher(N int) hash.Hash {
 	return h
 }
 
-func (ubi *UBI) NewMACer(key []byte, N int) hash.Hash {
-	h := &hasher{
+func (ubi *UBI) NewMACer(key []byte, N int) *Hasher {
+	h := &Hasher{
 		ubi: ubi,
 		buf: make([]byte, ubi.blockBytes)[0:0],
 		key: make([]byte, len(key)),
@@ -161,70 +152,6 @@ func (ubi *UBI) NewMACer(key []byte, N int) hash.Hash {
 	copy(h.key, key)
 	h.Reset()
 	return h
-}
-
-func (h *hasher) Write(b []byte) (n int, err error) {
-	written := len(b)
-
-	// If the buffer plus b won't fill up more than a full block, just add it to the buffer and return.
-	if len(h.buf)+len(b) <= h.ubi.blockBytes {
-		h.buf = append(h.buf, b...)
-		return written, nil
-	}
-
-	// If we have something in the buffer we need to make a full block using that first.
-	if len(h.buf) > 0 {
-		amt := h.ubi.blockBytes - len(h.buf)
-		h.it.Block(append(h.buf, b[0:amt]...))
-		h.buf = h.buf[0:0]
-		b = b[amt:]
-	}
-
-	// Iterate until we don't have more than a full block.
-	for len(b) > h.ubi.blockBytes {
-		h.it.Block(b[0:h.ubi.blockBytes])
-		b = b[h.ubi.blockBytes:]
-	}
-
-	// Store anything up to a single remaining full block for later.
-	h.buf = append(h.buf, b...)
-
-	return written, nil
-}
-func (h *hasher) Sum(b []byte) []byte {
-	Gn := h.it.Finish(h.buf, 0)
-
-	buf := make([]byte, int(h.n)/8+h.ubi.blockBytes)
-	view := buf[:]
-	// put c in an array so we can convert it to bytes to pass to UBI.
-	var c [1]uint64
-	cb := convert.Inplace1Uint64ToBytes(c[:])[:]
-	iterations := (h.n + uint64(h.ubi.blockSize) - 1) / uint64(h.ubi.blockSize)
-	for c[0] < iterations {
-		copy(view, h.ubi.UBI(Gn, cb, tweakTypeOut))
-		view = view[h.ubi.blockBytes:]
-		c[0]++
-	}
-	if uint64(len(buf)*8) > h.n {
-		buf = buf[0 : int(h.n+7)/8]
-		if h.n&0x07 != 0 {
-			// This masks away the upper bits that we don't care about, in the event that we asked for a
-			// number of bits that doesn't evenly divide a byte.
-			buf[len(buf)-1] = buf[len(buf)-1] & ((1 << uint(h.n&0x07)) - 1)
-		}
-	}
-	return append(b, buf...)
-}
-func (h *hasher) Reset() {
-	Gn := h.ubi.getInitialChainingValue(h.key, h.n)
-	h.it = h.ubi.Iterate(Gn, tweakTypeMsg)
-	h.buf = h.buf[0:0]
-}
-func (h *hasher) Size() int {
-	return (int(h.n) + 7) / 8
-}
-func (h *hasher) BlockSize() int {
-	return h.ubi.blockSize
 }
 
 func (ubi *UBI) Hash(M []byte, MBits int, N uint64) []byte {
@@ -257,7 +184,7 @@ func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
 	cb := convert.Inplace1Uint64ToBytes(c[:])[:]
 	iterations := (N + uint64(ubi.blockSize) - 1) / uint64(ubi.blockSize)
 	for c[0] < iterations {
-		copy(view, ubi.UBI(Gn, cb, tweakTypeOut))
+		copy(view, ubi.UBI(Gn, cb, TweakTypeOut))
 		view = view[ubi.blockBytes:]
 		c[0]++
 	}
@@ -275,7 +202,7 @@ func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
 func (ubi *UBI) getInitialChainingValue(K []byte, N uint64) []byte {
 	var G0 []byte
 	if len(K) > 0 {
-		Kcompressed := ubi.UBI(make([]byte, ubi.blockBytes), K, tweakTypeKey)
+		Kcompressed := ubi.UBI(make([]byte, ubi.blockBytes), K, TweakTypeKey)
 		G0 = ubi.UBI(Kcompressed, []byte{
 			0x53, 0x48, 0x41, 0x33, // SHA3
 			0x01, 0x00, // Version Number
@@ -283,7 +210,7 @@ func (ubi *UBI) getInitialChainingValue(K []byte, N uint64) []byte {
 			byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
 			0x00, 0x00, 0x00, // Tree params
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
-		}, tweakTypeCfg)
+		}, TweakTypeCfg)
 	} else {
 		var ok bool
 		ubi.mu.RLock()
@@ -297,7 +224,7 @@ func (ubi *UBI) getInitialChainingValue(K []byte, N uint64) []byte {
 				byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
 				0x00, 0x00, 0x00, // Tree params
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
-			}, tweakTypeCfg)
+			}, TweakTypeCfg)
 			ubi.mu.Lock()
 			ubi.gs[N] = G0
 			ubi.mu.Unlock()
@@ -320,12 +247,12 @@ const (
 )
 
 var (
-	tweakTypeKey = [2]uint64{0, uint64(typeKey)}
-	tweakTypeCfg = [2]uint64{0, uint64(typeCfg)}
-	tweakTypePrs = [2]uint64{0, uint64(typePrs)}
-	tweakTypePK  = [2]uint64{0, uint64(typePK)}
-	tweakTypeKdf = [2]uint64{0, uint64(typeKdf)}
-	tweakTypeNon = [2]uint64{0, uint64(typeNon)}
-	tweakTypeMsg = [2]uint64{0, uint64(typeMsg)}
-	tweakTypeOut = [2]uint64{0, uint64(typeOut)}
+	TweakTypeKey = [2]uint64{0, uint64(typeKey)}
+	TweakTypeCfg = [2]uint64{0, uint64(typeCfg)}
+	TweakTypePrs = [2]uint64{0, uint64(typePrs)}
+	TweakTypePK  = [2]uint64{0, uint64(typePK)}
+	TweakTypeKdf = [2]uint64{0, uint64(typeKdf)}
+	TweakTypeNon = [2]uint64{0, uint64(typeNon)}
+	TweakTypeMsg = [2]uint64{0, uint64(typeMsg)}
+	TweakTypeOut = [2]uint64{0, uint64(typeOut)}
 )

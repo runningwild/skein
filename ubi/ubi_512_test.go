@@ -23,23 +23,32 @@ func TestSkein512(t *testing.T) {
 		})
 
 		Convey("hasher object matches stand-alone function", func() {
-			for _, length := range []int{0, 1, 2, 63, 64, 65, 127, 128, 129, 1000, 1024 * 1024} {
+			for _, length := range []int{0, 1, 63, 64, 65, 127, 128, 129, 1000, 10 * 1024} {
 				b := make([]byte, length)
 				for i := range b {
 					b[i] = byte(i)
 				}
 				for _, N := range []int{64, 256, 512, 1000} {
 					h := u.NewHasher(N)
-					expected := u.Hash(b, len(b)*8, uint64(N))
-					for _, amt := range []int{1, 2, 10, 32, 63, 64, 65, 100} {
-						buf := b
-						for len(buf) > amt {
-							h.Write(buf[0:amt])
-							buf = buf[amt:]
+					lbbs := []int{1, 2, 3, 4, 5, 6, 7, 8}
+					if length == 0 {
+						lbbs = []int{0}
+					}
+					for _, lbb := range lbbs {
+						expected := u.Hash(b, len(b)*8-8+lbb, uint64(N))
+						for _, amt := range []int{1, 2, 31, 32, 33, 100} {
+							buf := b
+							for len(buf) > amt {
+								h.Write(buf[0:amt])
+								buf = buf[amt:]
+							}
+							h.Write(buf)
+							So(h.SumBits(nil, lbb%8), ShouldResemble, expected)
+							if lbb == 8 {
+								So(h.Sum(nil), ShouldResemble, expected)
+							}
+							h.Reset()
 						}
-						h.Write(buf)
-						So(h.Sum(nil), ShouldResemble, expected)
-						h.Reset()
 					}
 				}
 			}
@@ -47,23 +56,32 @@ func TestSkein512(t *testing.T) {
 
 		Convey("MACer object matches stand-alone function", func() {
 			key := []byte("super-secret key")
-			for _, length := range []int{0, 1, 2, 30, 31, 32, 33, 63, 64, 65, 1000, 1024 * 1024} {
+			for _, length := range []int{0, 1, 63, 64, 65, 127, 128, 129, 1000, 10 * 1024} {
 				b := make([]byte, length)
 				for i := range b {
 					b[i] = byte(i)
 				}
 				for _, N := range []int{64, 256, 512, 1000} {
 					h := u.NewMACer(key, N)
-					expected := u.MAC(key, b, len(b)*8, uint64(N))
-					for _, amt := range []int{1, 2, 10, 31, 32, 33, 100} {
-						buf := b
-						for len(buf) > amt {
-							h.Write(buf[0:amt])
-							buf = buf[amt:]
+					lbbs := []int{1, 2, 3, 4, 5, 6, 7, 8}
+					if length == 0 {
+						lbbs = []int{0}
+					}
+					for _, lbb := range lbbs {
+						expected := u.MAC(key, b, len(b)*8-8+lbb, uint64(N))
+						for _, amt := range []int{1, 2, 31, 32, 33, 100} {
+							buf := b
+							for len(buf) > amt {
+								h.Write(buf[0:amt])
+								buf = buf[amt:]
+							}
+							h.Write(buf)
+							So(h.SumBits(nil, lbb%8), ShouldResemble, expected)
+							if lbb == 8 {
+								So(h.Sum(nil), ShouldResemble, expected)
+							}
+							h.Reset()
 						}
-						h.Write(buf)
-						So(h.Sum(nil), ShouldResemble, expected)
-						h.Reset()
 					}
 				}
 			}
