@@ -1,5 +1,5 @@
-// Package skein provides functions for computing skein hashes using 1024-bit skein.
-package skein
+// Package hash provides functions for computing skein hashes using 1024-bit skein.
+package hash
 
 import (
 	"fmt"
