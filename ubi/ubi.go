@@ -154,28 +154,32 @@ func (ubi *UBI) NewMACer(key []byte, N int) *Hasher {
 	return h
 }
 
-func (ubi *UBI) Hash(M []byte, MBits int, N uint64) []byte {
-	return ubi.skein(nil, []tuple{{typeMsg, M, MBits}}, N)
+func (ubi *UBI) Hash(M []byte, lastByteBits int, N uint64) []byte {
+	return ubi.skein(nil, []Tuple{{TypeMsg, M, lastByteBits}}, N)
 }
 
-func (ubi *UBI) MAC(K []byte, M []byte, MBits int, N uint64) []byte {
-	return ubi.skein(K, []tuple{{typeMsg, M, MBits}}, N)
+func (ubi *UBI) MAC(K []byte, M []byte, lastByteBits int, N uint64) []byte {
+	return ubi.skein(K, []Tuple{{TypeMsg, M, lastByteBits}}, N)
 }
 
-type tuple struct {
-	typ     configType
-	msg     []byte
-	msgBits int
+type Tuple struct {
+	Type         ConfigType
+	Msg          []byte
+	LastByteBits int
 }
 
 // Nb - The internal state size, this is known implicitly in the ubi object.
 // No (N) - The output size, in bits.
 // K - A key of Nk bytes. Set to the empty string (Nk = 0) if no key is desired.
 // L List of t tuples (Ti,Mi) where Ti is a type value and Mi is a string of bits encoded in a string of bytes.
-func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
-	var Gn []byte = ubi.getInitialChainingValue(K, N)
+// NEXT: This method should be exported, and we shouldn't bother exporting the Hash and MAC methods above.  Or should we?
+func (ubi *UBI) skein(K []byte, L []Tuple, N uint64) []byte {
+	var Gn []byte = ubi.GetInitialChainingValue(K, N)
 	for i := range L {
-		Gn = ubi.UBIBits(Gn, L[i].msgBits&0x07, L[i].msg, [2]uint64{0, uint64(L[i].typ)})
+		if L[i].LastByteBits < 0 || L[i].LastByteBits > 7 {
+			panic("LastByteBits must be in range [0, 7]")
+		}
+		Gn = ubi.UBIBits(Gn, L[i].LastByteBits, L[i].Msg, [2]uint64{0, uint64(L[i].Type)})
 	}
 	buf := make([]byte, int(N)/8+ubi.blockBytes)
 	view := buf[:]
@@ -184,7 +188,7 @@ func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
 	cb := convert.Inplace1Uint64ToBytes(c[:])[:]
 	iterations := (N + uint64(ubi.blockSize) - 1) / uint64(ubi.blockSize)
 	for c[0] < iterations {
-		copy(view, ubi.UBI(Gn, cb, TweakTypeOut))
+		copy(view, ubi.UBI(Gn, cb, tweakTypeOut))
 		view = view[ubi.blockBytes:]
 		c[0]++
 	}
@@ -199,10 +203,10 @@ func (ubi *UBI) skein(K []byte, L []tuple, N uint64) []byte {
 	return buf
 }
 
-func (ubi *UBI) getInitialChainingValue(K []byte, N uint64) []byte {
+func (ubi *UBI) GetInitialChainingValue(K []byte, N uint64) []byte {
 	var G0 []byte
 	if len(K) > 0 {
-		Kcompressed := ubi.UBI(make([]byte, ubi.blockBytes), K, TweakTypeKey)
+		Kcompressed := ubi.UBI(make([]byte, ubi.blockBytes), K, tweakTypeKey)
 		G0 = ubi.UBI(Kcompressed, []byte{
 			0x53, 0x48, 0x41, 0x33, // SHA3
 			0x01, 0x00, // Version Number
@@ -210,7 +214,7 @@ func (ubi *UBI) getInitialChainingValue(K []byte, N uint64) []byte {
 			byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
 			0x00, 0x00, 0x00, // Tree params
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
-		}, TweakTypeCfg)
+		}, tweakTypeCfg)
 	} else {
 		var ok bool
 		ubi.mu.RLock()
@@ -224,7 +228,7 @@ func (ubi *UBI) getInitialChainingValue(K []byte, N uint64) []byte {
 				byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
 				0x00, 0x00, 0x00, // Tree params
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
-			}, TweakTypeCfg)
+			}, tweakTypeCfg)
 			ubi.mu.Lock()
 			ubi.gs[N] = G0
 			ubi.mu.Unlock()
@@ -233,26 +237,26 @@ func (ubi *UBI) getInitialChainingValue(K []byte, N uint64) []byte {
 	return G0
 }
 
-type configType uint64
+type ConfigType uint64
 
 const (
-	typeKey configType = 0 << (120 - 64)
-	typeCfg configType = 4 << (120 - 64)
-	typePrs configType = 8 << (120 - 64)
-	typePK  configType = 12 << (120 - 64)
-	typeKdf configType = 16 << (120 - 64)
-	typeNon configType = 20 << (120 - 64)
-	typeMsg configType = 48 << (120 - 64)
-	typeOut configType = 63 << (120 - 64)
+	TypeKey ConfigType = 0 << (120 - 64)
+	TypeCfg ConfigType = 4 << (120 - 64)
+	TypePrs ConfigType = 8 << (120 - 64)
+	TypePK  ConfigType = 12 << (120 - 64)
+	TypeKdf ConfigType = 16 << (120 - 64)
+	TypeNon ConfigType = 20 << (120 - 64)
+	TypeMsg ConfigType = 48 << (120 - 64)
+	TypeOut ConfigType = 63 << (120 - 64)
 )
 
 var (
-	TweakTypeKey = [2]uint64{0, uint64(typeKey)}
-	TweakTypeCfg = [2]uint64{0, uint64(typeCfg)}
-	TweakTypePrs = [2]uint64{0, uint64(typePrs)}
-	TweakTypePK  = [2]uint64{0, uint64(typePK)}
-	TweakTypeKdf = [2]uint64{0, uint64(typeKdf)}
-	TweakTypeNon = [2]uint64{0, uint64(typeNon)}
-	TweakTypeMsg = [2]uint64{0, uint64(typeMsg)}
-	TweakTypeOut = [2]uint64{0, uint64(typeOut)}
+	tweakTypeKey = [2]uint64{0, uint64(TypeKey)}
+	tweakTypeCfg = [2]uint64{0, uint64(TypeCfg)}
+	tweakTypePrs = [2]uint64{0, uint64(TypePrs)}
+	tweakTypePK  = [2]uint64{0, uint64(TypePK)}
+	tweakTypeKdf = [2]uint64{0, uint64(TypeKdf)}
+	tweakTypeNon = [2]uint64{0, uint64(TypeNon)}
+	tweakTypeMsg = [2]uint64{0, uint64(TypeMsg)}
+	tweakTypeOut = [2]uint64{0, uint64(TypeOut)}
 )

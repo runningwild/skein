@@ -57,7 +57,7 @@ func (h *Hasher) sumInternal(b []byte, lbb int) []byte {
 	cb := convert.Inplace1Uint64ToBytes(c[:])[:]
 	iterations := (h.n + uint64(h.ubi.blockSize) - 1) / uint64(h.ubi.blockSize)
 	for c[0] < iterations {
-		copy(view, h.ubi.UBI(Gn, cb, TweakTypeOut))
+		copy(view, h.ubi.UBI(Gn, cb, tweakTypeOut))
 		view = view[h.ubi.blockBytes:]
 		c[0]++
 	}
@@ -73,8 +73,8 @@ func (h *Hasher) sumInternal(b []byte, lbb int) []byte {
 }
 
 func (h *Hasher) Reset() {
-	Gn := h.ubi.getInitialChainingValue(h.key, h.n)
-	h.it = h.ubi.Iterate(Gn, TweakTypeMsg)
+	Gn := h.ubi.GetInitialChainingValue(h.key, h.n)
+	h.it = h.ubi.Iterate(Gn, tweakTypeMsg)
 	h.buf = h.buf[0:0]
 }
 
