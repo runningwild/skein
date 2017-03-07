@@ -1,42 +1,38 @@
-package ubi_test
+package hash_test
 
 import (
 	"testing"
 
-	tf1024 "github.com/runningwild/skein/threefish/1024"
-	tf256 "github.com/runningwild/skein/threefish/256"
-	tf512 "github.com/runningwild/skein/threefish/512"
-	"github.com/runningwild/skein/ubi"
+	skein1024 "github.com/runningwild/skein/hash/1024"
+	skein256 "github.com/runningwild/skein/hash/256"
+	skein512 "github.com/runningwild/skein/hash/512"
 	"golang.org/x/crypto/sha3"
 )
 
 func BenchmarkSkein_256_256_16B(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf256.TweakableBlockCipher{})
 	msg := make([]byte, 16)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein256.Hash256(256, msg)
 	}
 }
 
 func BenchmarkSkein_512_256_16B(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf512.TweakableBlockCipher{})
 	msg := make([]byte, 16)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein512.Hash512(256, msg)
 	}
 }
 
 func BenchmarkSkein_1024_256_16B(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf1024.TweakableBlockCipher{})
 	msg := make([]byte, 16)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein1024.Hash1024(256, msg)
 	}
 }
 
@@ -61,31 +57,28 @@ func BenchmarkShake_256_16B(b *testing.B) {
 
 func BenchmarkSkein_256_256_1k(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf256.TweakableBlockCipher{})
 	msg := make([]byte, 1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein256.Hash256(256, msg)
 	}
 }
 
 func BenchmarkSkein_512_256_1k(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf512.TweakableBlockCipher{})
 	msg := make([]byte, 1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein512.Hash512(256, msg)
 	}
 }
 
 func BenchmarkSkein_1024_256_1k(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf1024.TweakableBlockCipher{})
 	msg := make([]byte, 1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein1024.Hash1024(256, msg)
 	}
 }
 
@@ -110,31 +103,28 @@ func BenchmarkShake_256_1k(b *testing.B) {
 
 func BenchmarkSkein_256_256_1M(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf256.TweakableBlockCipher{})
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein256.Hash256(256, msg)
 	}
 }
 
 func BenchmarkSkein_512_256_1M(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf512.TweakableBlockCipher{})
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein512.Hash512(256, msg)
 	}
 }
 
 func BenchmarkSkein_1024_256_1M(b *testing.B) {
 	b.StopTimer()
-	u, _ := ubi.New(tf1024.TweakableBlockCipher{})
 	msg := make([]byte, 1024*1024)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		u.Hash(msg, len(msg)*8, 256)
+		skein1024.Hash1024(256, msg)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash"
 
+	"github.com/runningwild/skein/hash/hasher"
 	"github.com/runningwild/skein/threefish/512"
 	"github.com/runningwild/skein/ubi"
 )
@@ -22,20 +23,32 @@ func init() {
 
 // NewHash512 returns a hash.Hash object that computes N-bit hashes using 512-bit skein.
 func NewHash512(N int) hash.Hash {
-	return u.NewHasher(N)
+	return hasher.NewHasher(u, N)
 }
 
 // NewMAC512 returns a hash.Hash object that computes N-bit MAC using key and 512-bit skein.
 func NewMAC512(N int, key []byte) hash.Hash {
-	return u.NewMACer(key, N)
+	return hasher.NewMACer(u, key, N)
 }
 
 // Hash512 returns the N-bit hash of data using 512-bit skein.
 func Hash512(N int, data []byte) []byte {
-	return u.Hash(data, len(data)*8, uint64(N))
+	return hasher.Hash(u, data, 0, uint64(N))
 }
 
 // MAC512 returns the N-bit MAC of data using key 512-bit skein.
 func MAC512(N int, key, data []byte) []byte {
-	return u.MAC(key, data, len(data)*8, uint64(N))
+	return hasher.MAC(u, key, data, 0, uint64(N))
+}
+
+// Hash512Bits returns the N-bit hash of data using 512-bit skein.  lbb specifies the number of bits
+// that should be used in the last byte of data.
+func Hash512Bits(N int, data []byte, lbb int) []byte {
+	return hasher.Hash(u, data, lbb, uint64(N))
+}
+
+// MAC512Bits returns the N-bit MAC of data using key 512-bit skein.  lbb specifies the number of bits
+// that should be used in the last byte of data.
+func MAC512Bits(N int, key, data []byte, lbb int) []byte {
+	return hasher.MAC(u, key, data, lbb, uint64(N))
 }

@@ -40,6 +40,10 @@ type UBI struct {
 	gs map[uint64][]byte
 }
 
+func (ubi *UBI) TBC() types.TweakableBlockCipher {
+	return ubi.tbc
+}
+
 func (ubi *UBI) UBI(G []byte, M []byte, Ts [2]uint64) []byte {
 	return ubi.UBIBits(G, 0, M, Ts)
 }
@@ -132,36 +136,6 @@ func (it *Iterator) Finish(M []byte, lastByteBits int) []byte {
 	return lastBlock
 }
 
-func (ubi *UBI) NewHasher(N int) *Hasher {
-	h := &Hasher{
-		ubi: ubi,
-		buf: make([]byte, ubi.blockBytes)[0:0],
-		n:   uint64(N),
-	}
-	h.Reset()
-	return h
-}
-
-func (ubi *UBI) NewMACer(key []byte, N int) *Hasher {
-	h := &Hasher{
-		ubi: ubi,
-		buf: make([]byte, ubi.blockBytes)[0:0],
-		key: make([]byte, len(key)),
-		n:   uint64(N),
-	}
-	copy(h.key, key)
-	h.Reset()
-	return h
-}
-
-func (ubi *UBI) Hash(M []byte, lastByteBits int, N uint64) []byte {
-	return ubi.skein(nil, []Tuple{{TypeMsg, M, lastByteBits}}, N)
-}
-
-func (ubi *UBI) MAC(K []byte, M []byte, lastByteBits int, N uint64) []byte {
-	return ubi.skein(K, []Tuple{{TypeMsg, M, lastByteBits}}, N)
-}
-
 type Tuple struct {
 	Type         ConfigType
 	Msg          []byte
@@ -173,7 +147,7 @@ type Tuple struct {
 // K - A key of Nk bytes. Set to the empty string (Nk = 0) if no key is desired.
 // L List of t tuples (Ti,Mi) where Ti is a type value and Mi is a string of bits encoded in a string of bytes.
 // NEXT: This method should be exported, and we shouldn't bother exporting the Hash and MAC methods above.  Or should we?
-func (ubi *UBI) skein(K []byte, L []Tuple, N uint64) []byte {
+func (ubi *UBI) Skein(K []byte, L []Tuple, N uint64) []byte {
 	var Gn []byte = ubi.GetInitialChainingValue(K, N)
 	for i := range L {
 		if L[i].LastByteBits < 0 || L[i].LastByteBits > 7 {
