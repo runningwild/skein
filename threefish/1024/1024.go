@@ -71,6 +71,9 @@ func Encrypt(data []byte, key []byte, tweak []byte) {
 	if len(key) != 136 {
 		panic("Encrypt requires that key is exactly 136 bytes")
 	}
+	if len(tweak) != 24 {
+		panic("Encrypt requires that tweak is exactly 24 bytes")
+	}
 	encrypt1024(convert.Inplace128BytesToUInt64(data), convert.Inplace136BytesToUInt64(key), convert.Inplace24BytesToUInt64(tweak))
 }
 
@@ -83,6 +86,9 @@ func Decrypt(data []byte, key []byte, tweak []byte) {
 	}
 	if len(key) != 136 {
 		panic("Encrypt requires that key is exactly 136 bytes")
+	}
+	if len(tweak) != 24 {
+		panic("Decrypt requires that tweak is exactly 24 bytes")
 	}
 	decrypt1024(convert.Inplace128BytesToUInt64(data), convert.Inplace136BytesToUInt64(key), convert.Inplace24BytesToUInt64(tweak))
 }
