@@ -71,7 +71,7 @@ type Iterator struct {
 
 func (ubi *UBI) Iterate(G []byte, Ts [2]uint64) *Iterator {
 	if len(G) != ubi.blockBytes {
-		panic(fmt.Sprintf("G must match the block size, %d != %d", len(G), ubi.blockSize))
+		panic(fmt.Sprintf("G must match the block size, %d != %d", len(G), ubi.blockBytes))
 	}
 	if Ts[1]&(1<<(119-64)) != 0 {
 		panic("cannot call UBI with the BitPad field set on Ts")
@@ -84,6 +84,7 @@ func (ubi *UBI) Iterate(G []byte, Ts [2]uint64) *Iterator {
 	}
 
 	tweak := make([]uint64, 3)
+	tweak[0] = Ts[0]
 	tweak[1] = Ts[1] | (1 << (126 - 64)) // set the 'first' bit
 
 	// TODO: This is another case that isn't portable on big-endian machines.  Probably want to have
@@ -131,6 +132,7 @@ func (it *Iterator) Finish(M []byte, lastByteBits int) []byte {
 	}
 	buf := make([]byte, it.ubi.blockBytes)
 	copy(buf, lastBlock)
+
 	it.ubi.tbc.Encrypt(lastBlock, it.h, convert.Inplace3Uint64ToBytes(tweak[:])[:])
 	convert.Xor(lastBlock, lastBlock, buf)
 	return lastBlock
@@ -148,12 +150,40 @@ type Tuple struct {
 // L List of t tuples (Ti,Mi) where Ti is a type value and Mi is a string of bits encoded in a string of bytes.
 // NEXT: This method should be exported, and we shouldn't bother exporting the Hash and MAC methods above.  Or should we?
 func (ubi *UBI) Skein(K []byte, L []Tuple, N uint64) []byte {
-	var Gn []byte = ubi.GetInitialChainingValue(K, N)
+	return ubi.SkeinTree(K, L, N, 0, 0, 0)
+}
+
+func (ubi *UBI) SkeinTree(K []byte, L []Tuple, N uint64, Yl, Yf, Ym byte) []byte {
+	var Gn []byte = ubi.GetInitialChainingValue(K, N, Yl, Yf, Ym)
 	for i := range L {
 		if L[i].LastByteBits < 0 || L[i].LastByteBits > 7 {
 			panic("LastByteBits must be in range [0, 7]")
 		}
-		Gn = ubi.UBIBits(Gn, L[i].LastByteBits, L[i].Msg, [2]uint64{0, uint64(L[i].Type)})
+		if L[0].Type == TypeMsg && (Yl != 0 || Yf != 0 || Ym != 0) {
+			nodeBytes := ubi.blockBytes * (1 << Yl)
+			msg := L[i].Msg
+			var level int
+			for level = 1; level == 1 || len(msg) > ubi.blockBytes && level < int(Ym); level++ {
+				leaves := make([][]byte, (len(msg)+nodeBytes-1)/nodeBytes)
+				for i := 0; i < len(leaves)-1; i++ {
+					leaves[i] = msg[i*nodeBytes : (i+1)*nodeBytes]
+				}
+				leaves[len(leaves)-1] = msg[(len(leaves)-1)*nodeBytes:]
+				var Mnext []byte
+				for i, leaf := range leaves {
+					tweak := [2]uint64{uint64(i * nodeBytes), uint64(TypeMsg) | (uint64(level) << (112 - 64))}
+					Mnext = append(Mnext, ubi.UBI(Gn, leaf, tweak)...)
+				}
+				nodeBytes = ubi.blockBytes * (1 << Yf)
+				msg = Mnext
+			}
+			if level == int(Ym) && len(msg) != ubi.blockBytes {
+				msg = ubi.UBI(Gn, msg, [2]uint64{0, uint64(TypeMsg) | uint64(Ym)<<(112-64)})
+			}
+			Gn = msg
+		} else {
+			Gn = ubi.UBIBits(Gn, L[i].LastByteBits, L[i].Msg, [2]uint64{0, uint64(L[i].Type)})
+		}
 	}
 	buf := make([]byte, int(N)/8+ubi.blockBytes)
 	view := buf[:]
@@ -177,7 +207,7 @@ func (ubi *UBI) Skein(K []byte, L []Tuple, N uint64) []byte {
 	return buf
 }
 
-func (ubi *UBI) GetInitialChainingValue(K []byte, N uint64) []byte {
+func (ubi *UBI) GetInitialChainingValue(K []byte, N uint64, Yl, Yf, Ym byte) []byte {
 	var G0 []byte
 	if len(K) > 0 {
 		Kcompressed := ubi.UBI(make([]byte, ubi.blockBytes), K, tweakTypeKey)
@@ -186,27 +216,23 @@ func (ubi *UBI) GetInitialChainingValue(K []byte, N uint64) []byte {
 			0x01, 0x00, // Version Number
 			0x00, 0x00, // Reserved
 			byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
-			0x00, 0x00, 0x00, // Tree params
+			Yl, Yf, Ym, // Tree params
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
 		}, tweakTypeCfg)
 	} else {
-		var ok bool
-		ubi.mu.RLock()
-		G0, ok = ubi.gs[N]
-		ubi.mu.RUnlock()
-		if !ok {
-			G0 = ubi.UBI(make([]byte, ubi.blockBytes), []byte{
-				0x53, 0x48, 0x41, 0x33, // SHA3
-				0x01, 0x00, // Version Number
-				0x00, 0x00, // Reserved
-				byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
-				0x00, 0x00, 0x00, // Tree params
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
-			}, tweakTypeCfg)
-			ubi.mu.Lock()
-			ubi.gs[N] = G0
-			ubi.mu.Unlock()
-		}
+		// We don't bother caching tree configs because typically we're hashing so much that the
+		// gains are minimal.  It's something that could be done easily if needed though.
+		G0 = ubi.UBI(make([]byte, ubi.blockBytes), []byte{
+			0x53, 0x48, 0x41, 0x33, // SHA3
+			0x01, 0x00, // Version Number
+			0x00, 0x00, // Reserved
+			byte(N), byte(N >> 8), byte(N >> 16), byte(N >> 24), byte(N >> 32), byte(N >> 40), byte(N >> 48), byte(N >> 56), // Output size in bits (256)
+			Yl, Yf, Ym, // Tree params
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Reserved,
+		}, tweakTypeCfg)
+		ubi.mu.Lock()
+		ubi.gs[N] = G0
+		ubi.mu.Unlock()
 	}
 	return G0
 }

@@ -9,6 +9,10 @@ func Hash(u *ubi.UBI, M []byte, lastByteBits int, N uint64) []byte {
 	return u.Skein(nil, []ubi.Tuple{{ubi.TypeMsg, M, lastByteBits}}, N)
 }
 
+func TreeHash(u *ubi.UBI, M []byte, lastByteBits int, N uint64, Yl, Yf, Ym byte) []byte {
+	return u.SkeinTree(nil, []ubi.Tuple{{ubi.TypeMsg, M, lastByteBits}}, N, Yl, Yf, Ym)
+}
+
 func MAC(u *ubi.UBI, K []byte, M []byte, lastByteBits int, N uint64) []byte {
 	return u.Skein(K, []ubi.Tuple{{ubi.TypeMsg, M, lastByteBits}}, N)
 }
@@ -109,7 +113,7 @@ func (h *Hasher) sumInternal(b []byte, lbb int) []byte {
 }
 
 func (h *Hasher) Reset() {
-	Gn := h.ubi.GetInitialChainingValue(h.key, h.n)
+	Gn := h.ubi.GetInitialChainingValue(h.key, h.n, 0, 0, 0)
 	h.it = h.ubi.Iterate(Gn, [2]uint64{0, uint64(ubi.TypeMsg)})
 	h.buf = h.buf[0:0]
 }

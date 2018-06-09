@@ -36,6 +36,11 @@ func Hash1024(N int, data []byte) []byte {
 	return hasher.Hash(u, data, 0, uint64(N))
 }
 
+// TreeHash1024 returns the N-bit tree hash of data using 1024-bit skein and tree parameters Yl, Yf, and Ym.
+func TreeHash1024(N int, Yl, Yf, Ym byte, data []byte) []byte {
+	return hasher.TreeHash(u, data, 0, uint64(N), Yl, Yf, Ym)
+}
+
 // MAC1024 returns the N-bit MAC of data using key 1024-bit skein.
 func MAC1024(N int, key, data []byte) []byte {
 	return hasher.MAC(u, key, data, 0, uint64(N))

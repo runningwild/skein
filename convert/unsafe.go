@@ -120,6 +120,14 @@ func Inplace4Uint64ToBytes(v []uint64) *[32]byte {
 	return (*[32]byte)(unsafe.Pointer(&v[0]))
 }
 
+// Inplace5Uint64ToBytes returns a pointer to a [40]byte that covers the exact data in v.
+func Inplace5Uint64ToBytes(v []uint64) *[40]byte {
+	if len(v) != 5 {
+		return nil
+	}
+	return (*[40]byte)(unsafe.Pointer(&v[0]))
+}
+
 // Inplace8Uint64ToBytes returns a pointer to a [64]byte that covers the exact data in v.
 func Inplace8Uint64ToBytes(v []uint64) *[64]byte {
 	if len(v) != 8 {

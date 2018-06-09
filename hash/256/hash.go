@@ -36,6 +36,11 @@ func Hash256(N int, data []byte) []byte {
 	return hasher.Hash(u, data, 0, uint64(N))
 }
 
+// TreeHash256 returns the N-bit tree hash of data using 256-bit skein and tree parameters Yl, Yf, and Ym.
+func TreeHash256(N int, Yl, Yf, Ym byte, data []byte) []byte {
+	return hasher.TreeHash(u, data, 0, uint64(N), Yl, Yf, Ym)
+}
+
 // MAC256 returns the N-bit MAC of data using key 256-bit skein.
 func MAC256(N int, key, data []byte) []byte {
 	return hasher.MAC(u, key, data, 0, uint64(N))
