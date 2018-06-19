@@ -18,7 +18,6 @@ func NewTreeHasher(u *ubi.UBI, N int, Yl, Yf, Ym byte) *TreeHasher {
 		ym:         Ym,
 	}
 	h.Reset()
-	h.addLevel()
 	return h
 }
 
@@ -74,19 +73,19 @@ func (h *TreeHasher) bubbleUp(level int) bool {
 		return false
 	}
 	low := h.levels[level]
-	var high *treeLevel
-	if len(low.m) >= low.size && len(h.levels) <= level+1 {
-		h.addLevel()
-		high = h.levels[level+1]
+	if len(low.m) < low.size {
+		return false
 	}
-	compressed := false
+	if len(h.levels) <= level+1 {
+		h.addLevel()
+	}
+	high := h.levels[level+1]
 	for len(low.m) >= low.size {
 		high.m = append(high.m, h.ubi.UBI(h.gn, low.m[0:low.size], low.tweak)...)
 		low.m = low.m[low.size:]
 		low.tweak[0] += uint64(low.size)
-		compressed = true
 	}
-	return compressed
+	return true
 }
 
 func (h *TreeHasher) Write(data []byte) (n int, err error) {
@@ -101,7 +100,7 @@ func (h *TreeHasher) Write(data []byte) (n int, err error) {
 
 	// If we have something in the buffer we need to make a full block using that first.
 	if len(h.levels[0].m) > 0 {
-		amt := h.blockBytes - len(h.levels[0].m)
+		amt := h.levels[0].size - len(h.levels[0].m)
 		h.levels[0].m = append(h.levels[0].m, data[0:amt]...)
 		h.bubbleUp(0)
 		data = data[amt:]
@@ -143,8 +142,10 @@ func (h *TreeHasher) Sum(b []byte) []byte {
 	var g []byte
 	if h.rootIt != nil {
 		rootIt := h.rootIt
-		for len(carry) > h.blockBytes {
+		if len(carry) > h.blockBytes {
 			rootIt = h.rootIt.Clone()
+		}
+		for len(carry) > h.blockBytes {
 			rootIt.Block(carry[0:h.blockBytes])
 			carry = carry[h.blockBytes:]
 		}
@@ -211,6 +212,8 @@ func (h *TreeHasher) Sum(b []byte) []byte {
 func (h *TreeHasher) Reset() {
 	h.it = h.ubi.Iterate(h.gn, [2]uint64{0, uint64(ubi.TypeMsg)})
 	h.rootIt = nil
+	h.levels = nil
+	h.addLevel()
 }
 
 func (h *TreeHasher) Size() int {

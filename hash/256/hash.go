@@ -26,6 +26,12 @@ func NewHash256(N int) hash.Hash {
 	return hasher.NewHasher(u, N)
 }
 
+// NewTreeHash256 reurns a hash.Hash object that computes a 256-bit Skein tree hash using the
+// specified parameters.
+func NewTreeHash256(N int, Yl, Yf, Ym byte) hash.Hash {
+	return hasher.NewTreeHasher(u, N, Yl, Yf, Ym)
+}
+
 // NewMAC256 returns a hash.Hash object that computes N-bit MAC using key and 256-bit skein.
 func NewMAC256(N int, key []byte) hash.Hash {
 	return hasher.NewMACer(u, key, N)
