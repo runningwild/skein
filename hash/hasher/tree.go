@@ -1,6 +1,9 @@
 package hasher
 
 import (
+	"bytes"
+	"sync"
+
 	"github.com/runningwild/skein/convert"
 	"github.com/runningwild/skein/ubi"
 )
@@ -80,10 +83,32 @@ func (h *TreeHasher) bubbleUp(level int) bool {
 		h.addLevel()
 	}
 	high := h.levels[level+1]
-	for len(low.m) >= low.size {
-		high.m = append(high.m, h.ubi.UBI(h.gn, low.m[0:low.size], low.tweak)...)
-		low.m = low.m[low.size:]
-		low.tweak[0] += uint64(low.size)
+
+	if true {
+		// This is where the parallelism is for now.
+		var blocks, outputs [][]byte
+		for start := 0; start+low.size <= len(low.m); start += low.size {
+			blocks = append(blocks, low.m[start:start+low.size])
+			outputs = append(outputs, nil)
+		}
+		var wg sync.WaitGroup
+		for i := range blocks {
+			wg.Add(1)
+			go func(index int, tweak [2]uint64) {
+				defer wg.Done()
+				outputs[index] = h.ubi.UBI(h.gn, blocks[i], tweak)
+			}(i, low.tweak)
+			low.tweak[0] += uint64(low.size)
+		}
+		wg.Wait()
+		low.m = low.m[low.size*len(blocks):]
+		high.m = bytes.Join(append([][]byte{high.m}, outputs...), nil)
+	} else {
+		for len(low.m) >= low.size {
+			high.m = append(high.m, h.ubi.UBI(h.gn, low.m[0:low.size], low.tweak)...)
+			low.m = low.m[low.size:]
+			low.tweak[0] += uint64(low.size)
+		}
 	}
 	return true
 }
@@ -123,9 +148,6 @@ func (h *TreeHasher) Write(data []byte) (n int, err error) {
 	return written, nil
 }
 
-// NEXT: Most of the machinery for the tree hasher is in place, just need to extract the final value
-//       - we need to bubble up starting at the leaves because even if there is one byte it will affect
-//         everything above it, we can't just look at the root.
 func (h *TreeHasher) Sum(b []byte) []byte {
 	height := 0
 	for height = len(h.levels) - 1; height > 0 && len(h.levels[height].m) == 0; height-- {

@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	skein512 "github.com/runningwild/skein/hash/512"
+	"hash"
+	"tmp/psha2"
 	// "github.com/runningwild/skein/hash/hasher"
 	// "github.com/runningwild/skein/ubi"
 	// "golang.org/x/crypto/sha3"
@@ -17,8 +19,8 @@ type testCase struct {
 }
 
 type hashFunction struct {
-	name     string
-	function func([]byte, int)
+	name   string
+	hasher hash.Hash
 }
 
 func BenchmarkHashes(b *testing.B) {
@@ -36,19 +38,17 @@ func BenchmarkHashes(b *testing.B) {
 	} {
 		msg := make([]byte, tc.size)
 		for _, hash := range []hashFunction{
-			hashFunction{name: "skein_tree_512_1_1_2  ", function: func(msg []byte, N int) {
-				h := skein512.NewTreeHash512(512, 1, 1, 2)
-				for i := 0; i < N; i++ {
-					h.Reset()
-					for rep := 0; rep < tc.reps; rep++ {
-						h.Write(msg)
-					}
-					h.Sum(nil)
-				}
-			}},
+			hashFunction{name: "skein_tree_512_1_1_2  ", hasher: skein512.NewTreeHash512(512, 11, 1, 2)},
+			hashFunction{name: "psha2                 ", hasher: psha2.New()},
 		} {
 			b.Run(fmt.Sprintf("%s-%d*%s", hash.name, tc.reps, tc.name), func(b *testing.B) {
-				hash.function(msg, b.N)
+				for i := 0; i < b.N; i++ {
+					hash.hasher.Reset()
+					for rep := 0; rep < tc.reps; rep++ {
+						hash.hasher.Write(msg)
+					}
+					hash.hasher.Sum(nil)
+				}
 			})
 		}
 	}
