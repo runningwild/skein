@@ -69,6 +69,20 @@ type Iterator struct {
 	buf        []byte
 }
 
+func (it *Iterator) Clone() *Iterator {
+	c := &Iterator{
+		ubi:   it.ubi,
+		tweak: make([]uint64, len(it.tweak)),
+		h:     make([]byte, len(it.h)),
+		buf:   make([]byte, len(it.buf)),
+	}
+	copy(c.tweak, it.tweak)
+	c.tweakBytes = convert.Inplace3Uint64ToBytes(c.tweak)[:]
+	copy(c.h, it.h)
+	copy(c.buf, it.buf)
+	return c
+}
+
 func (ubi *UBI) Iterate(G []byte, Ts [2]uint64) *Iterator {
 	if len(G) != ubi.blockBytes {
 		panic(fmt.Sprintf("G must match the block size, %d != %d", len(G), ubi.blockBytes))
