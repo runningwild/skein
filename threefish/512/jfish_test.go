@@ -3,6 +3,7 @@ package threefish_test
 import (
 	"testing"
 
+	"github.com/runningwild/skein/convert"
 	"github.com/runningwild/skein/threefish/512"
 )
 
@@ -51,4 +52,27 @@ func tweakForLane(lane int) []byte {
 		tweak[i] = byte(i ^ (1 << uint(lane)))
 	}
 	return tweak
+}
+
+func BenchmarkJFish100Mb(b *testing.B) {
+	b.StopTimer()
+	jf := threefish.MakeJFish([64]byte{0, 1, 2})
+	raw := make([]byte, 100*1024*1024/8)
+	var count uint64
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		data := raw
+		for len(data) > 0 {
+			for i := 0; i < jf.NumLanes(); i++ {
+				copy(jf.State(i), data[i*64:(i+1)*64])
+				convert.InplaceBytesToUint64(jf.Tweak(i))[0] = count
+				count++
+			}
+			jf.Encrypt()
+			for i := 0; i < jf.NumLanes(); i++ {
+				copy(data[i*64:(i+1)*64], jf.State(i))
+			}
+			data = data[jf.NumLanes()*64:]
+		}
+	}
 }
