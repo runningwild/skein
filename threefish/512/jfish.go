@@ -40,7 +40,7 @@ func MakeJFish(key [64]byte) JFish {
 	if cpuid.HasExtendedFeature(cpuid.AVX2) {
 		return jfishMakerRegistry["avx2"](key)
 	}
-	return makeJFishBasic(key)
+	return MakeDefaultJFish(key)
 }
 
 type jFishBasic struct {
@@ -49,7 +49,7 @@ type jFishBasic struct {
 	tweak [3]uint64
 }
 
-func makeJFishBasic(key [64]byte) JFish {
+func MakeDefaultJFish(key [64]byte) JFish {
 	key64 := convert.Inplace64BytesToUInt64(key[:])
 	var j jFishBasic
 	copy(j.key[:], key64[:])
