@@ -60,12 +60,16 @@ func BenchmarkJFish100Mb(b *testing.B) {
 	raw := make([]byte, 100*1024*1024/8)
 	var count uint64
 	b.StartTimer()
+	var tweaks [][]uint64
+	for i := 0; i < jf.NumLanes(); i++ {
+		tweaks = append(tweaks, convert.InplaceBytesToUint64(jf.Tweak(i)))
+	}
 	for i := 0; i < b.N; i++ {
 		data := raw
 		for len(data) > 0 {
 			for i := 0; i < jf.NumLanes(); i++ {
 				copy(jf.State(i), data[i*64:(i+1)*64])
-				convert.InplaceBytesToUint64(jf.Tweak(i))[0] = count
+				tweaks[i][0] = count
 				count++
 			}
 			jf.Encrypt()
