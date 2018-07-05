@@ -2,6 +2,7 @@ package hasher
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 
 	"github.com/runningwild/skein/convert"
@@ -21,6 +22,7 @@ func NewTreeHasher(u *ubi.UBI, N int, Yl, Yf, Ym byte) *TreeHasher {
 		ym:         Ym,
 	}
 	h.Reset()
+	fmt.Printf("Starting tree stuff...\n")
 	return h
 }
 
@@ -34,8 +36,6 @@ type TreeHasher struct {
 	leafBytes  int
 	nodeBytes  int
 	yl, yf, ym byte
-
-	it *ubi.Iterator
 
 	// rootIt is used exclusively for the root of the tree.
 	rootIt *ubi.Iterator
@@ -84,7 +84,35 @@ func (h *TreeHasher) bubbleUp(level int) bool {
 	}
 	high := h.levels[level+1]
 
-	if true {
+	numLanes := h.ubi.TBC().JFish(nil).NumLanes()
+	if numLanes > 1 {
+		var blocks [][]byte
+		for start := 0; start+low.size <= len(low.m); start += low.size {
+			blocks = append(blocks, low.m[start:start+low.size])
+		}
+		low.m = low.m[low.size*len(blocks):]
+		var outputs [][]byte
+		for len(blocks) > 0 {
+			var Ms [][]byte
+			var Ts [][2]uint64
+			for i := 0; i < numLanes && i < len(blocks); i++ {
+				Ms = append(Ms, blocks[i])
+				Ts = append(Ts, low.tweak)
+				fmt.Printf("M: %x\n", blocks[i])
+				fmt.Printf("T: %x\n", low.tweak)
+				low.tweak[0] += uint64(low.size)
+			}
+			blocks = blocks[len(Ms):]
+			for _, output := range h.ubi.UBIJFish(h.gn, Ms, Ts) {
+				fmt.Printf("O: %x\n", output)
+				outputs = append(outputs, output)
+			}
+		}
+		if len(outputs) > 1 {
+			outputs[0], outputs[1] = outputs[1], outputs[0]
+		}
+		high.m = bytes.Join(append([][]byte{high.m}, outputs...), nil)
+	} else if false {
 		// This is where the parallelism is for now.
 		var blocks, outputs [][]byte
 		for start := 0; start+low.size <= len(low.m); start += low.size {
@@ -105,7 +133,11 @@ func (h *TreeHasher) bubbleUp(level int) bool {
 		high.m = bytes.Join(append([][]byte{high.m}, outputs...), nil)
 	} else {
 		for len(low.m) >= low.size {
-			high.m = append(high.m, h.ubi.UBI(h.gn, low.m[0:low.size], low.tweak)...)
+			fmt.Printf("M: %x\n", low.m[0:low.size])
+			fmt.Printf("T: %x\n", low.tweak)
+			x := h.ubi.UBI(h.gn, low.m[0:low.size], low.tweak)
+			high.m = append(high.m, x...)
+			fmt.Printf("O: %x\n", x)
 			low.m = low.m[low.size:]
 			low.tweak[0] += uint64(low.size)
 		}
@@ -232,7 +264,6 @@ func (h *TreeHasher) Sum(b []byte) []byte {
 // }
 
 func (h *TreeHasher) Reset() {
-	h.it = h.ubi.Iterate(h.gn, [2]uint64{0, uint64(ubi.TypeMsg)})
 	h.rootIt = nil
 	h.levels = nil
 	h.addLevel()

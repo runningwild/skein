@@ -61,6 +61,57 @@ func (ubi *UBI) UBIBits(G []byte, lastByteBits int, M []byte, Ts [2]uint64) []by
 	return it.Finish(M, lastByteBits)
 }
 
+func (ubi *UBI) UBIJFish(G []byte, Ms [][]byte, Ts [][2]uint64) [][]byte {
+	jfish := ubi.TBC().JFish(G)
+
+	if len(Ms) > jfish.NumLanes() || len(Ts) > jfish.NumLanes() {
+		panic("cannot run more lanes in UBIJFish than the jfish supports")
+	}
+	if len(Ms) != len(Ts) {
+		panic("must have as many messages as tweaks")
+	}
+	for i := 0; i < len(Ms)-1; i++ {
+		if len(Ms[i]) != len(Ms[i+1]) {
+			panic("each message must be the same length")
+		}
+	}
+
+	var its []*Iterator
+	for _, t := range Ts {
+		its = append(its, ubi.Iterate(G, t))
+	}
+	fmt.Printf("JFishing %d blocks\n", len(Ms))
+	for len(Ms[0]) > ubi.blockBytes {
+		for i, it := range its {
+			it.blockPrefix(Ms[i][0:it.ubi.blockBytes])
+			copy(jfish.State(i), it.buf)
+			fmt.Printf("Copying tweak %x\n", it.tweakBytes)
+			copy(jfish.Tweak(i), it.tweakBytes)
+		}
+		jfish.Encrypt()
+		for i, it := range its {
+			copy(it.buf, jfish.State(i))
+			it.blockSuffix(Ms[i])
+			Ms[i] = Ms[i][ubi.blockBytes:]
+		}
+	}
+
+	var lastBlocks [][]byte
+	for i, it := range its {
+		lastBlock, tweak := it.finishPrefix(Ms[i], 0)
+		lastBlocks = append(lastBlocks, lastBlock)
+		copy(jfish.State(i), lastBlock)
+		fmt.Printf("Copying tweak %x\n", tweak)
+		copy(jfish.Tweak(i), tweak)
+	}
+	jfish.Encrypt()
+	var hashes [][]byte
+	for i, it := range its {
+		hashes = append(hashes, it.finishSuffix(lastBlocks[i], jfish.State(i)))
+	}
+	return hashes
+}
+
 type Iterator struct {
 	ubi        *UBI
 	tweak      []uint64
@@ -120,35 +171,53 @@ func (ubi *UBI) Iterate(G []byte, Ts [2]uint64) *Iterator {
 }
 
 func (it *Iterator) Block(M []byte) {
+	it.blockPrefix(M)
+	it.ubi.tbc.Encrypt(it.buf, it.h, it.tweakBytes)
+	it.blockSuffix(M)
+}
+
+func (it *Iterator) blockPrefix(M []byte) {
+	fmt.Printf("blockPrefix(%x)\n", M)
 	copy(it.buf, M)
 
 	// Here we aren't supporting sizes over 2^64, even though the spec supports up to 2^96.
 	it.tweak[0] += uint64(it.ubi.blockBytes)
 
-	it.ubi.tbc.Encrypt(it.buf, it.h, it.tweakBytes)
+}
+
+func (it *Iterator) blockSuffix(M []byte) {
 	convert.XorBytes(it.h[0:it.ubi.blockBytes], M, it.buf)
 	it.tweak[1] &^= (1 << (126 - 64)) // unset the 'first' bit
 }
 
 func (it *Iterator) Finish(M []byte, lastByteBits int) []byte {
-	var tweak [3]uint64
-	copy(tweak[:], it.tweak)
-	tweak[0] += uint64(len(M))
-	tweak[1] |= (1 << (127 - 64)) // set the 'last' bit
-	lastBlock := make([]byte, it.ubi.blockBytes)
+	lastBlock, tweak := it.finishPrefix(M, lastByteBits)
+	buf := make([]byte, len(lastBlock))
+	copy(buf, lastBlock)
+	it.ubi.tbc.Encrypt(lastBlock, it.h, tweak)
+	return it.finishSuffix(buf, lastBlock)
+}
+func (it *Iterator) finishPrefix(M []byte, lastByteBits int) (lastBlock, tweak []byte) {
+	var _tweak [3]uint64
+	copy(_tweak[:], it.tweak)
+	_tweak[0] += uint64(len(M))
+	_tweak[1] |= (1 << (127 - 64)) // set the 'last' bit
+	lastBlock = make([]byte, it.ubi.blockBytes)
 	copy(lastBlock, M)
 	if lastByteBits != 0 {
-		tweak[1] |= (1 << (119 - 64)) // set the 'bitpad' bit
+		_tweak[1] |= (1 << (119 - 64)) // set the 'bitpad' bit
 		b := lastBlock[len(M)-1]
 		var lastUsedBit byte = 1 << uint(7-lastByteBits+1)
 		b = (b &^ (lastUsedBit - 1)) | (lastUsedBit >> 1)
 		lastBlock[len(M)-1] = b
 	}
-	buf := make([]byte, it.ubi.blockBytes)
-	copy(buf, lastBlock)
-
-	it.ubi.tbc.Encrypt(lastBlock, it.h, convert.Inplace3Uint64ToBytes(tweak[:])[:])
-	convert.Xor(lastBlock, lastBlock, buf)
+	tweak = convert.Inplace3Uint64ToBytes(_tweak[:])[:]
+	// fmt.Printf("finishPrefix(%x, %x, %x, %x)\n", M, lastBlock, it.tweak, tweak)
+	return
+}
+func (it *Iterator) finishSuffix(lastBlock, encryptedLastBlock []byte) []byte {
+	convert.Xor(lastBlock, lastBlock, encryptedLastBlock)
+	fmt.Printf("finishSuffix(%x)\n", lastBlock)
 	return lastBlock
 }
 
@@ -174,6 +243,7 @@ func (ubi *UBI) SkeinTree(K []byte, L []Tuple, N uint64, Yl, Yf, Ym byte) []byte
 			panic("LastByteBits must be in range [0, 7]")
 		}
 		if L[0].Type == TypeMsg && (Yl != 0 || Yf != 0 || Ym != 0) {
+			fmt.Printf("Starting tree stuff...\n")
 			nodeBytes := ubi.blockBytes * (1 << Yl)
 			msg := L[i].Msg
 			var level int

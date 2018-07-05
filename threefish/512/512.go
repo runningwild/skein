@@ -2,6 +2,7 @@ package threefish
 
 import (
 	"github.com/runningwild/skein/convert"
+	"github.com/runningwild/skein/types"
 )
 
 const c240 = 0x1bd11bdaa9fc1a22
@@ -59,6 +60,10 @@ func (t TweakableBlockCipher) BlockSize() int {
 
 func (t TweakableBlockCipher) TweakSize() int {
 	return 128
+}
+
+func (t TweakableBlockCipher) JFish() types.JFish {
+	return MakeJFish()
 }
 
 // Encrypt encrypts a single block of 64 bytes in place using key and tweak.  The actual key

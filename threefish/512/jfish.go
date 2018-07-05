@@ -4,31 +4,16 @@ import (
 	"fmt"
 
 	"github.com/intel-go/cpuid"
-	"github.com/runningwild/skein/convert"
+	"github.com/runningwild/skein/types"
 )
-
-type JFish interface {
-	// Returns the number of lanes this JFish object operates on.
-	NumLanes() int
-
-	// Returns the state for the specified lane.
-	State(lane int) []byte
-
-	// Returns the tweaks for the specified lane.
-	Tweak(lane int) []byte
-
-	// Encrypts each state block using the corresponding tweak and the key that the JFish object was
-	// created with.
-	Encrypt()
-}
 
 var (
-	jfishMakerRegistry map[string]func(key [64]byte) JFish
+	jfishMakerRegistry map[string]func() types.JFish
 )
 
-func jfishRegister(id string, maker func(key [64]byte) JFish) {
+func jfishRegister(id string, maker func() types.JFish) {
 	if jfishMakerRegistry == nil {
-		jfishMakerRegistry = make(map[string]func(key [64]byte) JFish)
+		jfishMakerRegistry = make(map[string]func() types.JFish)
 	}
 	if _, ok := jfishMakerRegistry[id]; ok {
 		panic(fmt.Sprintf("already registered a jfish for id %q", id))
@@ -36,11 +21,11 @@ func jfishRegister(id string, maker func(key [64]byte) JFish) {
 	jfishMakerRegistry[id] = maker
 }
 
-func MakeJFish(key [64]byte) JFish {
+func MakeJFish() types.JFish {
 	if cpuid.HasExtendedFeature(cpuid.AVX2) {
-		return jfishMakerRegistry["avx2"](key)
+		return jfishMakerRegistry["avx2"]()
 	}
-	return MakeDefaultJFish(key)
+	return MakeDefaultJFish()
 }
 
 type jFishBasic struct {
@@ -49,31 +34,17 @@ type jFishBasic struct {
 	tweak [3]uint64
 }
 
-func MakeDefaultJFish(key [64]byte) JFish {
-	key64 := convert.Inplace64BytesToUInt64(key[:])
-	var j jFishBasic
-	copy(j.key[:], key64[:])
-	return &j
+func MakeDefaultJFish() types.JFish {
+	return &jFishBasic{}
 }
 
 func (j *jFishBasic) NumLanes() int {
 	return 1
 }
 
-func (j *jFishBasic) State(lane int) []byte {
-	if lane != 0 {
-		panic(fmt.Sprintf("lane %d is not available on a 1-lane JFish", lane))
+func (j *jFishBasic) Encrypt(state, key, tweak [][]byte) {
+	if len(state) != 1 || len(key) != 1 || len(tweak) != 1 {
+		panic("called Encrypt without exactly one lane")
 	}
-	return convert.InplaceUint64ToBytes(j.state[:])
-}
-
-func (j *jFishBasic) Tweak(lane int) []byte {
-	if lane != 0 {
-		panic(fmt.Sprintf("lane %d is not available on a 1-lane JFish", lane))
-	}
-	return convert.InplaceUint64ToBytes(j.tweak[0:2])
-}
-
-func (j *jFishBasic) Encrypt() {
 	encrypt512(&j.state, &j.key, &j.tweak)
 }

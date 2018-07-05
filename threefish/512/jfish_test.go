@@ -5,34 +5,29 @@ import (
 
 	"github.com/runningwild/skein/convert"
 	"github.com/runningwild/skein/threefish/512"
+	"github.com/runningwild/skein/types"
 )
 
 func TestJFish(t *testing.T) {
-	var key [64]byte
-	for i := range key {
-		key[i] = byte(i + 100)
-	}
-	jf := threefish.MakeJFish(key)
+	jf := threefish.MakeJFish()
+	var states, keys, tweaks [][]byte
 	for i := 0; i < jf.NumLanes(); i++ {
-		copy(jf.State(i), stateForLane(i))
-		copy(jf.Tweak(i), tweakForLane(i))
+		states = append(states, stateForLane(i))
+		keys = append(keys, keyForLane(i))
+		tweaks = append(tweaks, tweakForLane(i))
 	}
-	jf.Encrypt()
+	jf.Encrypt(states, keys, tweaks)
 	for i := 0; i < jf.NumLanes(); i++ {
-		state := stateForLane(i)
+		want := stateForLane(i)
 		tbc := threefish.TweakableBlockCipher{}
 		var extendedKey [72]byte
 		var extendedTweak [24]byte
-		copy(extendedKey[:], key[:])
+		copy(extendedKey[:], keys[i])
 		copy(extendedTweak[:], tweakForLane(i))
-		tbc.Encrypt(state, extendedKey[:], extendedTweak[:])
-		jfState := jf.State(i)
-		if len(jfState) != len(state) {
-			t.Fatalf("got state length %d, want %d", len(jf.State(i)), len(state))
-		}
-		for j := range jfState {
-			if jfState[j] != state[j] {
-				t.Errorf("state at offset %d is %d, want %d", j, jfState[j], state[j])
+		tbc.Encrypt(want, extendedKey[:], extendedTweak[:])
+		for j := range states[i] {
+			if states[i][j] != want[j] {
+				t.Errorf("state at offset %d is %d, want %d", j, states[i][j], want[j])
 			}
 		}
 	}
@@ -46,6 +41,15 @@ func stateForLane(lane int) []byte {
 	return state
 }
 
+func keyForLane(lane int) []byte {
+	key := make([]byte, 64)
+	return key
+	for i := range key {
+		key[i] = byte(i - lane)
+	}
+	return key
+}
+
 func tweakForLane(lane int) []byte {
 	tweak := make([]byte, 64)
 	for i := range tweak {
@@ -57,12 +61,12 @@ func tweakForLane(lane int) []byte {
 func BenchmarkJFish100Mb(b *testing.B) {
 	for _, name := range []string{"default", "arch"} {
 		b.Run(name, func(b *testing.B) {
-			var jf threefish.JFish
+			var jf types.JFish
 			switch name {
 			case "default":
-				jf = threefish.MakeDefaultJFish([64]byte{0, 1, 2})
+				jf = threefish.MakeDefaultJFish()
 			case "arch":
-				jf = threefish.MakeJFish([64]byte{0, 1, 2})
+				jf = threefish.MakeJFish()
 			default:
 				b.Fatalf("unexpected test")
 			}
@@ -70,22 +74,23 @@ func BenchmarkJFish100Mb(b *testing.B) {
 			raw := make([]byte, 100*1024*1024/8)
 			var count uint64
 			b.StartTimer()
-			var tweaks [][]uint64
+			states := make([][]byte, jf.NumLanes())
+			keys := make([][]byte, jf.NumLanes())
+			tweaks := make([][]byte, jf.NumLanes())
+			tweakNums := make([][]uint64, jf.NumLanes())
 			for i := 0; i < jf.NumLanes(); i++ {
-				tweaks = append(tweaks, convert.InplaceBytesToUint64(jf.Tweak(i)))
+				tweaks[i] = make([]byte, 16)
+				tweakNums[i] = convert.InplaceBytesToUint64(tweaks[i])
 			}
 			for i := 0; i < b.N; i++ {
 				data := raw
 				for len(data) > 0 {
 					for i := 0; i < jf.NumLanes(); i++ {
-						copy(jf.State(i), data[i*64:(i+1)*64])
-						tweaks[i][0] = count
+						states[i] = data[i*64 : (i+1)*64]
+						tweakNums[i][0] = count
 						count++
 					}
-					jf.Encrypt()
-					for i := 0; i < jf.NumLanes(); i++ {
-						copy(data[i*64:(i+1)*64], jf.State(i))
-					}
+					jf.Encrypt(states, keys, tweaks)
 					data = data[jf.NumLanes()*64:]
 				}
 			}

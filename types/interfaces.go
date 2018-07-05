@@ -15,4 +15,14 @@ type TweakableBlockCipher interface {
 
 	// TweakSize returns tweak size of this cipher in bits.
 	TweakSize() int
+
+	// Returns a JFish object that implements the same underlying cipher as this object.
+	JFish() JFish
+}
+
+type JFish interface {
+	// Returns the number of lanes this JFish object operates on.
+	NumLanes() int
+
+	Encrypt(state, key, tweak [][]byte)
 }
